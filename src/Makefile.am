@@ -1,0 +1,1 @@
+SUBDIRS = gnugo gauGoCore
