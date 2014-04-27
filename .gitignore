@@ -1,0 +1,15 @@
+build/
+doc/
+backup/
+*.m4
+*.am
+ar-lib
+*.cache
+config.*
+configure
+depcomp
+*.stackdump
+install-sh
+Makefile.in
+missing
+compile
