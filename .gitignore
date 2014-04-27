@@ -2,7 +2,6 @@ build/
 doc/
 backup/
 *.m4
-aminclude.am
 ar-lib
 *.cache
 config.*
