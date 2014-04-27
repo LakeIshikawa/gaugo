@@ -1,7 +1,7 @@
 build/
 doc/
 backup/
-*.m4
+aclocal.m4
 ar-lib
 *.cache
 config.*
