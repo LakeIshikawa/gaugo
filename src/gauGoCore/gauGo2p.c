@@ -38,7 +38,7 @@ int main(int argc, char** argv)
   // Game loop
   while(1){
     // Print the board
-    Board_print(&board, stdout, 1, 1);
+    Board_print(&board, stdout, 1, 0);
 
     // Gets move from stdin
     printf("\nmove:");

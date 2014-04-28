@@ -6,12 +6,13 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
+
 #include "GTPBasicCommands.h"
 #include "uctSearch.h"
 #include "policies.h"
 #include "stoppers.h"
 #include "hashTable.h"
+#include "crash.h"
 
 void GTPBasicCommands_listCommands( GauGoEngine* engine, int argc, char** argv )
 {
@@ -46,8 +47,10 @@ void GTPBasicCommands_play( GauGoEngine* engine, int argc, char** argv )
   }
 
   // Checek color
-  if( ! ( ((strcmp( argv[1], "w" ) == 0 || (strcmp( argv[1], "W" ) == 0)) && engine->board.turn == WHITE)
-	  || ((strcmp( argv[1], "b" ) == 0 || (strcmp( argv[1], "B" ) == 0)) && engine->board.turn == BLACK) ) ) {
+  if( ! ( ((strcmp( argv[1], "w" ) == 0 || (strcmp( argv[1], "W" ) == 0)) 
+	   && engine->board.turn == WHITE)
+	  || ((strcmp( argv[1], "b" ) == 0 || (strcmp( argv[1], "B" ) == 0)) 
+	      && engine->board.turn == BLACK) ) ) {
     GauGoEngine_sayError( WRONG_COLOR );
     return;
   }
@@ -113,7 +116,7 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
     strcpy(moveStr, "pass");
   }
   else{
-    assert( Board_isLegal( &engine->board, move ) );
+    gauAssert( Board_isLegal( &engine->board, move ), &engine->board, NULL );
     
     // Play move
     Board_play( &engine->board, move );

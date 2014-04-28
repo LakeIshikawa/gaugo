@@ -7,10 +7,10 @@
 #include "board.h"
 #include "board_zobrist.h"
 #include "emptiesList.h"
+#include "crash.h"
 
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 #include <stdlib.h>
 
 
@@ -41,6 +41,7 @@ int zobristInitialized = 0;
 GRID Board_mergeGroup(Board* board, GRID dst, GRID src);
 
 /**
+
  * @brief Add the specified intersection as a liberty to the specified group
  * The liberty is added only if not already a liberty of the group.
  *
@@ -140,7 +141,7 @@ void Board_unsetStone(Board* board, INTERSECTION intersection);
 
 void Board_initialize(Board* board, unsigned char size)
 {
-  assert(size <= MAX_BOARD_SIZE);
+  gauAssert(size <= MAX_BOARD_SIZE, board, NULL);
 
   // set the size and compute the direction offsets
   board->size = size;
@@ -230,9 +231,11 @@ void Board_copy(Board* dst, Board* src)
   for( i=0; i<src->firstAvailableGroup; i++ ){
     dst->groups[i].stonesNum = src->groups[i].stonesNum;
     // Stones
-    memcpy( dst->groups[i].intersections, src->groups[i].intersections, sizeof(INTERSECTION)*src->groups[i].stonesNum );
+    memcpy( dst->groups[i].intersections, src->groups[i].intersections, 
+	    sizeof(INTERSECTION)*src->groups[i].stonesNum );
     // Libs
-    memcpy( dst->groups[i].liberties, src->groups[i].liberties, sizeof(INTERSECTION)*src->groups[i].libertiesNum );
+    memcpy( dst->groups[i].liberties, src->groups[i].liberties, 
+	    sizeof(INTERSECTION)*src->groups[i].libertiesNum );
   }
 
   // Set remaining groups to null
@@ -243,7 +246,7 @@ void Board_copy(Board* dst, Board* src)
 
 INTERSECTION Board_intersection(Board* board, int x, int y)
 {
-  assert( x>=0 && x < board->size && y >=0 && y < board->size );
+  gauAssert( x>=0 && x < board->size && y >=0 && y < board->size, board, NULL );
 
   return (INTERSECTION)(((y+1) * (board->size+1)) + x);
 }
@@ -260,7 +263,8 @@ int Board_intersectionY(Board* board, INTERSECTION intersection)
 
 Color Board_getColor(Board* board, INTERSECTION intersection)
 {
-  assert( intersection >= 0 && (intersection == PASS || intersection < MAX_INTERSECTION_NUM));
+  gauAssert( intersection >= 0 && (intersection == PASS || intersection < MAX_INTERSECTION_NUM),
+	     board, NULL);
   return board->intersectionMap[intersection];
 }
 
@@ -316,7 +320,7 @@ void Board_play(Board* board, INTERSECTION intersection)
 
 void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, EmptiesList* updateEmptiesList)
 {
-  assert(Board_isLegal(board, intersection));
+  gauAssert(Board_isLegal(board, intersection), board, NULL);
 
   // Resets ko
   Board_unsetKoPosition(board);
@@ -325,7 +329,7 @@ void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, EmptiesL
   short capturedStones = 0;
   INTERSECTION koPosition = -1;
 
-  // Create a group for the new stone (which will be eventually merged
+  // Create a group for the new stone (which will be eventually merged)
   int unifiedGroup = Board_placeStone(board, intersection, updateEmptiesList);
     
   /** 
@@ -386,7 +390,7 @@ void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, EmptiesL
 
 void Board_childHash(Board* board, INTERSECTION intersection, HashKey* outChildHash)
 {
-  assert(Board_isLegal(board, intersection));
+  gauAssert(Board_isLegal(board, intersection), board, NULL);
   
   // Copy current hash value
   *outChildHash = board->hashKey;
@@ -544,7 +548,7 @@ void Board_addGroupLiberty(Board* board, GRID group, INTERSECTION intersection)
   stGroup->liberties[stGroup->libertiesNum++] = intersection;
 
   // Also add a new mapping for this group's lib
-  assert(nmaps < 4);
+  gauAssert(nmaps < 4, board, NULL);
   board->libertyMap[intersection][nmaps] = group;
 }
 
@@ -584,7 +588,7 @@ void Board_removeGroupLibertyMap(Board* board, GRID group, INTERSECTION intersec
   }
 
   // The group does not appear in the specified liberty map
-  assert(0);
+  gauAssert(0, board, NULL);
 }
 
 void Board_killGroup(Board* board, GRID group, EmptiesList* updateEmptiesList)
@@ -712,25 +716,20 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo, int withLibertyM
   fprintf(stream, "hash: %016llx : %016llx\n", board->hashKey.key1, board->hashKey.key2);
 
   // Prints row header
-  fprintf(stream, "%-2s", "");
+  fprintf(stream, "%-3s", "");
 
   for( int i=0; i<board->size; i++ ){
-    fprintf(stream, "%c ", 'A'+i);
-  }
-
-  // Liberty map header
-  if( withLibertyMap ){
-    fprintf(stream, "     ");
-    for( int i=0; i<board->size; i++ ){
-      fprintf(stream, "%-12c ", 'A'+i);
-    } 
+    char letter;
+    if( 'A'+i >= 'I') letter = 'A'+i+1;
+    else letter = 'A'+i;
+    fprintf(stream, "%c ", letter);
   }
 
   fprintf(stream, "\n");
 
   // Prints every line
   for( int y=0; y<board->size; y++ ){
-    fprintf(stream, "%-2d", y+1);
+    fprintf(stream, "%-3d", y+1);
     // Prints every intersection
     for( int x=0; x<board->size; x++ ){
       int intersection = board->intersectionMap[Board_intersection(board, x, y)];
@@ -738,24 +737,7 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo, int withLibertyM
 	      intersection == BLACK ? 'X' : 
 	      intersection == EMPTY ? '-' : 
 	      intersection == WHITE ? 'O' : 'E');
-    }
-
-    // Liberty map info
-    if( withLibertyMap ){
-      fprintf(stream, "     ");
-      for( int x=0; x<board->size; x++ ){
-	int intersection = Board_intersection(board, x, y);
-	char libmapStr[13];
-	memset(libmapStr, 0, sizeof(libmapStr));
-	
-	foreach_libgroup(board, intersection){
-	  sprintf(libmapStr + strlen(libmapStr), "%d ", grit);
-	}
-
-	fprintf(stream, "%-12s ", libmapStr);
-      }
-    }
-    
+    }    
     fprintf(stream, "\n");
   }
 
@@ -798,6 +780,30 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo, int withLibertyM
       }
     }
   }
+
+  // Liberty map info
+  if( withLibertyMap ){
+    for( int y=0; y<board->size; y++ ){
+      for( int x=0; x<board->size; x++ ){
+	int intersection = Board_intersection(board, x, y);
+	char libmapStr[13];
+	memset(libmapStr, 0, sizeof(libmapStr));
+	
+	foreach_libgroup(board, intersection){
+	  sprintf(libmapStr + strlen(libmapStr), "%d ", grit);
+	}
+	
+	if( strlen(libmapStr) != 0 ){
+	  char name[4];
+	  Board_intersectionName(board, intersection, name);
+	  fprintf(stream, "%s:[%s] ", name, libmapStr);
+	}
+      }
+      
+      fprintf(stream, "\n");
+    }
+  }
+
 }
 
 void Board_intersectionName(Board* board, INTERSECTION intersection, char* nameBuffer)

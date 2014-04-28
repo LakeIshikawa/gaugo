@@ -4,10 +4,10 @@
  *
  **/
 #include "uctSearch.h"
+#include "crash.h"
 
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -233,17 +233,12 @@ INTERSECTION UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
   foreach_intersection(search->iter){
     if( Board_isLegal( search->board, intersection ) ){
       Board_childHash( search->board, intersection, &child );
-
+      
       // Probe child
       childNode = HashTable_retrieve( search->hashTable, &child );
-
-      #ifndef NDEBUG
-      if( !childNode ){
-	Board_print( search->board, stdout, 0, 0 );
-	printf("Child not found:%d(%016llx-%016llx)\n", intersection, child.key1, child.key2);
-	exit(1);
-      }
-      #endif
+      
+      gauAssertMsg(childNode!=NULL, search->board, search,
+		   "Child not found:%d(%016llx-%016llx)\n", intersection, child.key1, child.key2);
 
       float uctValue = UCTNode_evaluateUCT( childNode, pos, search->board->turn, search->UCTK );
       if( uctValue > bestUCT ) {

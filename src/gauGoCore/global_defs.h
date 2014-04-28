@@ -48,7 +48,7 @@ typedef short INTERSECTION;
  * The maximum theoretical number of legal strings(groups) is
  * actually 277... whatever.
  **/
-#define MAX_STONEGROUPS 256
+#define MAX_STONEGROUPS 255
 
 
 #endif
