@@ -9,7 +9,7 @@
 int STOPPER_5ksim( UCTSearch* search, int simulations )
 {
   // TEST
-  char buf[64];
+  //char buf[64];
   //Board_print( search->board, stdout, 0, 0 );
   //fgets( buf, 64, stdin );
 
@@ -23,6 +23,6 @@ int STOPPER_5ksim( UCTSearch* search, int simulations )
 
     fflush(stdout);
   }
-  return simulations >= 3000;
+  return simulations >= 15000;
 }
 

@@ -6,7 +6,6 @@
 
 #include "board.h"
 #include "board_zobrist.h"
-#include "emptiesList.h"
 #include "crash.h"
 
 #include <stdio.h>
@@ -87,10 +86,9 @@ void Board_addGroupStone(Board* board, GRID group, INTERSECTION stone);
  * including groupMap references and delete the group.
  *
  * @param board The board from which to kill the group
- * @param updateEmptiesList An optional empty list to update with played move
  * @param group The group to remove (pool index)
  **/
-void Board_killGroup(Board* board, GRID group, EmptiesList* updateEmptiesList);
+void Board_killGroup(Board* board, GRID group);
 
 /**
  * @brief Place a stone on the board and create a new group of stones.
@@ -98,11 +96,10 @@ void Board_killGroup(Board* board, GRID group, EmptiesList* updateEmptiesList);
  * around it.
  *
  * @param board The board
- * @param intersection The intersection to be added to the new group
- * @param updateEmptiesList An optional empty list to update with played move
+ * @param emptyId The ordinal of the empty intersection to be added to the new group
  * @return The pool index of the new group initialized with the single stone and its liberties
  **/
-GRID Board_placeStone(Board* board, INTERSECTION intersection, EmptiesList* updateEmptiesList);
+GRID Board_placeStone(Board* board, int emptyId);
 
 /**
  * @brief Sets the ko position to the specified intersection, 
@@ -125,10 +122,10 @@ void Board_unsetKoPosition(Board* board);
  * updating the hash key value accordingly. This function makes no error-checking
  *
  * @param board The board
- * @param intersection The intersection on which to place the stone
+ * @param emptyId The ordinal of the empty intersection on which to place the stone
  * @param color The color of the stone to place
  **/
-void Board_setStone(Board* board, INTERSECTION intersection, Color color);
+void Board_setStone(Board* board, int emptyId, Color color);
 
 /**
  * @brief Sets the specified intersection state to the specified stone color,
@@ -178,6 +175,7 @@ void Board_initialize(Board* board, unsigned char size)
   }
   
   // initialize the intersections
+  board->emptiesNum = 0;
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
     int x = i%(size+1);
     int y = i/(size+1);
@@ -186,6 +184,9 @@ void Board_initialize(Board* board, unsigned char size)
     }
     else{
       board->intersectionMap[i] = EMPTY;
+
+      // Add to empty list
+      board->empties[board->emptiesNum++] = i;
     }
 
     // Liberty map
@@ -202,46 +203,6 @@ void Board_copy(Board* dst, Board* src)
 {
   *dst = *src;
   return;
-
-  // Copy the size
-  dst->size = src->size;
-  // Copy direction offsets
-  memcpy(dst->directionOffsets, src->directionOffsets, sizeof(src->directionOffsets));
-
-  // Copy ko
-  dst->koPosition = src->koPosition;
-  // Copy captures
-  dst->whiteCaptures = src->whiteCaptures;
-  dst->blackCaptures = src->blackCaptures;
-  // Copy turn
-  dst->turn = src->turn;
-  // Copy next group idx
-  dst->firstAvailableGroup = src->firstAvailableGroup;
-
-  // Copy hash
-  memcpy(&dst->hashKey, &src->hashKey, sizeof( HashKey ));
-
-  // Copy maps
-  memcpy(dst->intersectionMap, src->intersectionMap, sizeof( src->intersectionMap ));
-  memcpy(dst->groupMap, src->groupMap, sizeof( src->groupMap ));
-  memcpy(dst->libertyMap, src->libertyMap, sizeof( src->libertyMap ));
-
-  // Copy groups
-  int i;
-  for( i=0; i<src->firstAvailableGroup; i++ ){
-    dst->groups[i].stonesNum = src->groups[i].stonesNum;
-    // Stones
-    memcpy( dst->groups[i].intersections, src->groups[i].intersections, 
-	    sizeof(INTERSECTION)*src->groups[i].stonesNum );
-    // Libs
-    memcpy( dst->groups[i].liberties, src->groups[i].liberties, 
-	    sizeof(INTERSECTION)*src->groups[i].libertiesNum );
-  }
-
-  // Set remaining groups to null
-  for( ; i<MAX_STONEGROUPS; i++ ){
-    dst->groups[i].stonesNum = 0;
-  }  
 }
 
 INTERSECTION Board_intersection(Board* board, int x, int y)
@@ -315,11 +276,19 @@ int Board_mustPass(Board* board, BoardIterator* iter)
 
 void Board_play(Board* board, INTERSECTION intersection)
 {
-  Board_playUpdatingEmpties(board, intersection, NULL);
+  for(int i=0; i<board->emptiesNum; i++ ){
+    if( board->empties[i] == intersection ){
+      Board_playEmpty(board, i);
+      return;
+    }
+  }
+
+  gauAssert(0, board, NULL);
 }
 
-void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, EmptiesList* updateEmptiesList)
+void Board_playEmpty(Board* board, int emptyId)
 {
+  INTERSECTION intersection = board->empties[emptyId];
   gauAssert(Board_isLegal(board, intersection), board, NULL);
 
   // Resets ko
@@ -330,7 +299,7 @@ void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, EmptiesL
   INTERSECTION koPosition = -1;
 
   // Create a group for the new stone (which will be eventually merged)
-  int unifiedGroup = Board_placeStone(board, intersection, updateEmptiesList);
+  int unifiedGroup = Board_placeStone(board, emptyId);
     
   /** 
    * First browse neighbourghs of played stone to connect all 
@@ -360,7 +329,7 @@ void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, EmptiesL
       capturedStones += stGroup->stonesNum;
       if( capturedStones == 1 ) koPosition = stGroup->intersections[0];
 
-      Board_killGroup( board, grit, updateEmptiesList );
+      Board_killGroup( board, grit );
     }
   }
 
@@ -591,7 +560,7 @@ void Board_removeGroupLibertyMap(Board* board, GRID group, INTERSECTION intersec
   gauAssert(0, board, NULL);
 }
 
-void Board_killGroup(Board* board, GRID group, EmptiesList* updateEmptiesList)
+void Board_killGroup(Board* board, GRID group)
 {
   StoneGroup* stGroup = STONE_GROUP(group);
   
@@ -611,20 +580,16 @@ void Board_killGroup(Board* board, GRID group, EmptiesList* updateEmptiesList)
 	Board_addGroupLiberty(board, board->groupMap[neigh], stone);
       }
     }
-
-    // Add new empty intersection to list if needed
-    if( updateEmptiesList ){
-      EmptiesList_add( updateEmptiesList, stone );
-    }
   }
 
   // Deletes the group
   stGroup->stonesNum = 0;
-  
 }
 
-GRID Board_placeStone(Board* board, INTERSECTION intersection, EmptiesList* updateEmptiesList)
+GRID Board_placeStone(Board* board, int emptyId)
 {
+  INTERSECTION intersection = board->empties[emptyId];
+
   // Initialize an available group
   GRID newGroup = board->firstAvailableGroup;
   StoneGroup* newGroupPt = STONE_GROUP(newGroup);
@@ -638,7 +603,7 @@ GRID Board_placeStone(Board* board, INTERSECTION intersection, EmptiesList* upda
   newGroupPt->libertiesNum = 0;
   
   // Put the stone on the board
-  Board_setStone(board, intersection, board->turn);
+  Board_setStone(board, emptyId, board->turn);
   board->groupMap[intersection] = newGroup;
 
   // Determines and adds the liberties
@@ -646,11 +611,6 @@ GRID Board_placeStone(Board* board, INTERSECTION intersection, EmptiesList* upda
     if( board->intersectionMap[neigh] == EMPTY ){
       Board_addGroupLiberty(board, newGroup, neigh);
     }
-  }
-
-  // Remove empty from list
-  if( updateEmptiesList ){
-    EmptiesList_delete( updateEmptiesList, intersection );
   }
 
   return newGroup;
@@ -673,8 +633,9 @@ void Board_unsetKoPosition(Board* board)
   }
 }
 
-void Board_setStone(Board* board, INTERSECTION intersection, Color color)
+void Board_setStone(Board* board, int emptyId, Color color)
 {
+  INTERSECTION intersection = board->empties[emptyId];
   board->intersectionMap[intersection] = color;
   
   switch( color ){
@@ -688,6 +649,9 @@ void Board_setStone(Board* board, INTERSECTION intersection, Color color)
     board->hashKey.key2 ^= zobrist2.white[intersection];
     break;
   }
+
+  // Remove empty from list
+  board->empties[emptyId] = board->empties[--board->emptiesNum];
 }
 
 void Board_unsetStone(Board* board, INTERSECTION intersection)
@@ -705,6 +669,9 @@ void Board_unsetStone(Board* board, INTERSECTION intersection)
   }
 
   board->intersectionMap[intersection] = EMPTY; 
+
+  // Add new empty intersection to list
+  board->empties[board->emptiesNum++] = intersection;
 }
 
 void Board_print(Board* board, FILE* stream, int withGroupInfo, int withLibertyMap)
@@ -780,6 +747,15 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo, int withLibertyM
       }
     }
   }
+
+  // Empties
+  fprintf(stream, "Empties: [");
+  foreach_empty(board){
+    char name[4];
+    Board_intersectionName( board, empty, name );
+    fprintf(stream, "%s ", name);
+  }
+  fprintf(stream, "]\n\n");
 
   // Liberty map info
   if( withLibertyMap ){

@@ -19,7 +19,8 @@
 
 
 // Forward declaration
-void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree, char* format, va_list args);
+void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree, 
+		   char* format, va_list args);
 
 /**
  * @brief Opens the first file named like gaucrashN.log that does
@@ -52,7 +53,8 @@ void _gauAssert(int exp, struct Board* board, struct UCTSearch* tree)
   _gauAssertPvt(exp, board, tree, NULL, NULL);
 }
 
-void _gauAssertMsg(int exp, struct Board* board, struct UCTSearch* tree, char* format, ...)
+void _gauAssertMsg(int exp, struct Board* board, struct UCTSearch* tree, 
+		   char* format, ...)
 {
   va_list args;
   va_start(args, format);
@@ -60,7 +62,8 @@ void _gauAssertMsg(int exp, struct Board* board, struct UCTSearch* tree, char* f
   va_end(args);
 }
 
-void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree, char* format, va_list args)
+void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree, 
+		   char* format, va_list args)
 {
   // If assertion is true, don't log anything
   if( exp ) return;
@@ -84,6 +87,11 @@ void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree, char* f
     fprintf(logFile, "------\\BOARD INFO -----\n\n");
   }
 
+  // Print additional message
+  fprintf(logFile, "------ MESSAGE -----\n");
+  vfprintf(logFile, format, args);
+  fprintf(logFile, "------\\MESSAGE  -----\n\n");
+
   // Close the log file
   fclose(logFile);
   
@@ -91,7 +99,7 @@ void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree, char* f
   assert(0);
 }
 
-void printTrace(FILE* stream)
+void _printTrace(FILE* stream)
 {
   void *array[20];
   size_t size;

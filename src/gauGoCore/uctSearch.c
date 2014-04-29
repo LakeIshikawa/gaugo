@@ -63,12 +63,8 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
   BoardIterator it;
   Board_iterator(&search->root, &it);
 
-  // Initializes empty square list
-  EmptiesList emptiesList;
-
   // Prepares search data
   search->iter = &it;
-  search->emptiesList = &emptiesList;
   search->UCTK = 0.44f;
 
   int simulations = 0;
@@ -79,9 +75,6 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     // Copy the board
     Board_copy( &boardCopy, &search->root );
     search->board = &boardCopy;
-
-    // Rebuild empties list
-    EmptiesList_initialize( &emptiesList, &it, &boardCopy);
 
     // Play one playout from the most UCT-RAVE promising node
     UCTSearch_playSimulation(search);
@@ -180,7 +173,7 @@ Color UCTSearch_playSimulation( UCTSearch* search )
       Board_pass( search->board );
     }
     else{
-      Board_playUpdatingEmpties( search->board, move, search->emptiesList );
+      Board_play( search->board, move );
     }
 
     // Recurse
@@ -204,9 +197,9 @@ void UCTSearch_createChildren( UCTSearch* search )
   // Browses all legal children
   HashKey child;
   UCTNode* childNode;
-  foreach_empty(search->emptiesList){
-    if( Board_isLegal( search->board, emptyNode->intersection ) ){
-      Board_childHash( search->board, emptyNode->intersection, &child );
+  foreach_empty(search->board){
+    if( Board_isLegal( search->board, empty ) ){
+      Board_childHash( search->board, empty, &child );
 
       // Probe child
       childNode = HashTable_retrieve( search->hashTable, &child );
@@ -230,7 +223,8 @@ INTERSECTION UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
   // Browses all legal children
   HashKey child;
   UCTNode* childNode;
-  foreach_intersection(search->iter){
+  foreach_empty(search->board){
+    INTERSECTION intersection = search->board->empties[empty];
     if( Board_isLegal( search->board, intersection ) ){
       Board_childHash( search->board, intersection, &child );
       
@@ -258,8 +252,10 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCT
 
   switch( turn ){
   case BLACK:
-    return ((float)node->winsBlack / node->played) + UCTK*sqrt( log(parent->played) / (5*node->played) );
+    return ((float)node->winsBlack / node->played) 
+      + UCTK*sqrt( log(parent->played) / (5*node->played) );
   case WHITE:
-    return (1.0f - ((float)node->winsBlack / node->played)) + UCTK*sqrt( log(parent->played) / (5*node->played) );
+    return (1.0f - ((float)node->winsBlack / node->played)) 
+      + UCTK*sqrt( log(parent->played) / (5*node->played) );
   }
 }

@@ -17,9 +17,6 @@
 
 #include <stdio.h>
 
-// Forward refs
-struct EmptiesList;
-
 /**
  * @brief Utility to retrieve a stone group by its pool index
  **/
@@ -104,6 +101,16 @@ typedef struct Board
   GRID libertyMap[MAX_INTERSECTION_NUM][4];
 
   /**
+   * List of empty squares
+   **/
+  short empties[MAX_INTERSECTION_NUM];
+
+  /**
+   * Number of empty squares
+   **/
+  short emptiesNum;
+
+  /**
    * Current turn to play
    **/
   Color turn;
@@ -164,6 +171,8 @@ typedef struct Board
  * being browsed.
  **/
 #define foreach_libgroup(board, intersection) GRID grit=board->libertyMap[intersection][0]; for(int i=0; i<4 && (grit!=NULL_GROUP); grit=board->libertyMap[intersection][++i] )
+
+#define foreach_empty(board) INTERSECTION empty=board->empties[0]; for(int i=0; i<board->emptiesNum; empty=board->empties[++i])
 
 /**
  * @brief Initialize a new board of the specified size
@@ -238,7 +247,7 @@ int Board_isLegal(Board* board, INTERSECTION intersection);
 int Board_mustPass(Board* board, BoardIterator* iter);
 
 /**
- * @brief Plays on the specified intersection of the board. Equivalent to Board_playUpdatingEmpties( board, intersection, NULL );
+ * @brief Plays at the specified intersection of the board.
  * The specified intersection must be legal
  *
  * @param board The board to play on
@@ -247,14 +256,16 @@ int Board_mustPass(Board* board, BoardIterator* iter);
 void Board_play(Board* board, INTERSECTION intersection);
 
 /**
- * @brief Plays on the specified intersection of the board updading the specified empty list meanwhile
- * The specified intersection must be legal
+ * @brief Plays at the empty intersection that has the
+ * specified ordinal index (emptyId) in the empties list.
+ * This function is faster than Board_play because it does
+ * not search the empty list.
  *
  * @param board The board to play on
- * @param intersection The intersection to play on
- * @param updateEmptiesList An optional empty list to update with played move
+ * @param emptyId The ordinal of the empty intersection in empties list
+ * to play at
  **/
-void Board_playUpdatingEmpties(Board* board, INTERSECTION intersection, struct EmptiesList* updateEmptiesList);
+void Board_playEmpty(Board* board, int emptyId);
 
 /**
  * @brief Calculates the hash-value of the child position of specified board

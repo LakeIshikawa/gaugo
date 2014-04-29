@@ -18,8 +18,9 @@ struct UCTSearch;
 
 // Debug and release definition of assertion macro
 #ifdef NDEBUG
-#define gauAssert(x...)
-#define gauAssertMsg(x...)
+#define gauAssert(...)
+#define gauAssertMsg(...)
+#define printTrace(...)
 #else
 
 /**

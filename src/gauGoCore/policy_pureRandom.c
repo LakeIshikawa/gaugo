@@ -27,62 +27,53 @@ int pureRandom_isPlayableMove( Board* board, INTERSECTION move )
   return 0;
 }
 
+/**
+ * @brief Play a random move uniformely over empty squares.
+ **/
+INTERSECTION pureRandom_playRandom(Board* board)
+{
+  // Linearly tries all moves from random point on
+  int randomPoint = rand() % board->emptiesNum;
+  
+  for(int i=randomPoint; i<board->emptiesNum; i++){
+    int intersection = board->empties[i];
+    // Play it
+    if( pureRandom_isPlayableMove( board,  intersection ) ){
+      // play move
+      Board_playEmpty( board, i );
+      return intersection;
+    }
+  }
+
+  for(int i=0; i<randomPoint; i++){
+    int intersection = board->empties[i];
+    // Play it
+    if( pureRandom_isPlayableMove( board,  intersection ) ){
+      // play move
+      Board_playEmpty( board, i );
+      return intersection;
+    }
+  }
+  
+  // No moves available - pass
+  Board_pass( board );
+  return PASS;
+}
+
 Color POLICY_pureRandom( UCTSearch* search )
 {
-  // Move buffer
-  INTERSECTION moveBuffer[MAX_INTERSECTION_NUM];
-  int numMoves = 0;
   int passed = 0;
-
-  // Number of empties at which to change policy
-  int emptiesHorizon = (search->board->size*search->board->size) * 0.75f;
-  int randomTries = 0;
   while( 1 ){
-    // If many empties on the board still, first try 4 times randomly
-    if( (randomTries<4) && search->emptiesList->length > emptiesHorizon ){
-      for(; randomTries<4; randomTries++ ) {
-	int randomMove = rand() % search->emptiesList->length;
-	EmptyNode* it = search->emptiesList->firstEmpty;
-	
-	for( int i=0; i<randomMove; i++ ){
-	  it = it->next;
-	}
-	
-	if( pureRandom_isPlayableMove( search->board, it->intersection ) ){
-	  // play move
-	  Board_playUpdatingEmpties( search->board, it->intersection, search->emptiesList );
-	  break;
-	}
+    INTERSECTION move = pureRandom_playRandom( search->board );
+    if( move == PASS ){
+      if( passed ){
+	// Endgame!
+	int score = (float)Board_trompTaylorScore( search->board, search->iter );
+	return (score > search->options->komi) ? BLACK : WHITE;
       }
-    }
-
-    
-    // Generates all playable moves and randomly chooses one
-    else{
-      numMoves = 0;
-      foreach_empty( search->emptiesList ){
-	if( pureRandom_isPlayableMove( search->board, emptyNode->intersection ) ){
-	  moveBuffer[numMoves++] = emptyNode->intersection;
-	}
-      }
-      
-      if( numMoves == 0 ){
-	if( passed ){
-	  // Endgame!
-	  int score = (float)Board_trompTaylorScore( search->board, search->iter );
-	  return (score > search->options->komi) ? BLACK : WHITE;
-	}
-	passed = 1;
-	Board_pass( search->board );
-      }
-
-      else{
-	// Randomly chooses and play move
-	int randomMove = rand() % numMoves;
-	// play move
-	Board_playUpdatingEmpties( search->board, moveBuffer[randomMove], search->emptiesList );
-	passed = 0;
-      }    
+      passed = 1;
+    } else {
+      passed = 0;
     }
   }
 }

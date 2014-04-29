@@ -12,7 +12,6 @@
 
 #include "global_defs.h"
 #include "board.h"
-#include "emptiesList.h"
 #include "hashTable.h"
 #include "options.h"
 
@@ -57,7 +56,6 @@ typedef struct UCTSearch
   // Incremental/temporary handles (change along search)
   Board* board;
   BoardIterator* iter;
-  EmptiesList* emptiesList;
 
   // Singleton-like data handles (constant along search)
   Board root;
