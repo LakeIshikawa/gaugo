@@ -96,13 +96,14 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
     return;
   }
 
-  // Create hash table
-  HashTable hashTable;
-  HashTable_initialize( &hashTable, engine->options.hashTableSize, sizeof( UCTNode ) );
+  // Initializes new empty tree
+  UCTTree tree;
+  UCTTree_initialize( &tree, engine->options.treePoolNodeNum );
 
   // UCT search
   UCTSearch search;
-  UCTSearch_initialize( &search, &engine->board, &hashTable, &POLICY_pureRandom, &STOPPER_5ksim, &engine->options );
+  UCTSearch_initialize( &search, &engine->board, &tree, &POLICY_pureRandom, 
+			&STOPPER_5ksim, &engine->options );
   INTERSECTION move = UCTSearch_search( &search );
 
   // Print pv (comment)
@@ -123,7 +124,7 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
     Board_intersectionName( &engine->board, move, moveStr );
   }
   
-  HashTable_delete( &hashTable );
+  UCTTree_delete( &tree );
   GauGoEngine_saySuccess(moveStr);
 }
 

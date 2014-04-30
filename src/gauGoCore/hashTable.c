@@ -33,7 +33,10 @@ void HashTable_delete(HashTable* table)
 void* HashTable_insert(HashTable* table, HashKey* key, void* data)
 {
   // First probe
-  HashKey* probe = (HashKey*)((char*)table->memory + (key->key1 & table->mask) * (sizeof(HashKey) + table->bucketSizeBytes));
+  HashKey* probe = 
+    (HashKey*)((char*)table->memory 
+	       + (key->key1 & table->mask) 
+	       * (sizeof(HashKey) + table->bucketSizeBytes));
 
   // Empty slot found
   if( probe->key1 == 0 && probe->key2 == 0 ){
@@ -47,7 +50,9 @@ void* HashTable_insert(HashTable* table, HashKey* key, void* data)
     // Search at intervals of key2
     int i=1;
     do {
-      probe = (HashKey*)((char*)table->memory + ((key->key1 + i*key->key2) & table->mask) * (sizeof(HashKey) + table->bucketSizeBytes));
+      probe = (HashKey*)((char*)table->memory 
+			 + ((key->key1 + i*key->key2) & table->mask) 
+			 * (sizeof(HashKey) + table->bucketSizeBytes));
       i++;
     } 
     while( probe->key1 != 0 || probe->key2 != 0 );
@@ -75,7 +80,9 @@ void* HashTable_retrieve(HashTable* table, HashKey* key)
   HashKey* probe;
 
   while( 1 ){
-    probe = (HashKey*)((char*)table->memory + ((key->key1 + i*key->key2) & table->mask) * (sizeof(HashKey) + table->bucketSizeBytes));
+    probe = (HashKey*)((char*)table->memory 
+		       + ((key->key1 + i*key->key2) & table->mask) 
+		       * (sizeof(HashKey) + table->bucketSizeBytes));
     if( probe->key1==0 && probe->key2==0 ) return NULL;
     if( probe->key1==key->key1 && probe->key2==key->key2 ) return ((char*)probe) + sizeof(HashKey);
 

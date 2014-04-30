@@ -11,11 +11,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-/**
- * A new node with no children
- **/
-UCTNode NEW_NODE = { 0,0,0,0 };
-
 // Private methods 
 
 /**
@@ -29,29 +24,34 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCT
  * and updates hashTable with result and RAVE informations.
  *
  * @param search The search
+ * @param node The node from which to descend the tree
  * @return The color of the winner of the single random playout that was performed
  **/
-Color UCTSearch_playSimulation( UCTSearch* search );
+Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node );
 
 /**
  * @brief Select the UCT-best children of speficied node 'pos', for the current turn player.
  *
  * @param search The search
  * @param pos The parent position
+ * @return The currently UCT-best child node of specified position
  **/
-INTERSECTION UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos );
+UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos );
 
 /**
  * @brief Create all legal children position of current board state 
- * initializing them to NEW_NODE, and stores them in the hash table.
+ * and stores them in the tree
  *
+ * @param search The search
+ * @param pos The position to expand
  **/
-void UCTSearch_createChildren( UCTSearch* search );
+void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos );
 
-void UCTSearch_initialize( UCTSearch* search, Board* board, HashTable* hashTable, POLICY policy, STOPPER stopper, Options* options )
+void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree, 
+			   POLICY policy, STOPPER stopper, Options* options )
 {
   search->root = *board;
-  search->hashTable = hashTable;
+  search->tree = tree;
   search->policy = policy;
   search->stopper = stopper;
   search->options = options;
@@ -77,53 +77,37 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     search->board = &boardCopy;
 
     // Play one playout from the most UCT-RAVE promising node
-    UCTSearch_playSimulation(search);
+    UCTSearch_playSimulation(search, &search->tree->root);
 
     simulations++;
   } while(!(*(search->stopper))(search, simulations));
 
-  // Obtains pv
-  boardCopy = search->root;
-  search->board = &boardCopy;
-
   INTERSECTION pv[MAX_INTERSECTION_NUM];
-  UCTSearch_getPv( search, pv );
+  UCTSearch_getPv( search, pv, &search->tree->root );
 
   return pv[0];
 }
 
-void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv )
+void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node )
 {
   // Select most visited move from root
   int mostPlayed = 0;
   INTERSECTION bestMove = PASS;
   
-  // Browses all legal children
-  HashKey child;
-  UCTNode* childNode;
-  BoardIterator* iter = search->iter;
-  foreach_intersection(iter){
-    if( Board_isLegal( search->board, intersection ) ){
-      Board_childHash( search->board, intersection, &child );
-      
-      // Probe child
-      childNode = HashTable_retrieve( search->hashTable, &child );
-      if( !childNode ) continue;
-
-      int played = childNode->played;
-      if( played > mostPlayed ) {
-	mostPlayed = played;
-	bestMove = intersection;
-      }
+  // Browses all children
+  foreach_child( node ){
+    int played = child->played;
+    if( played > mostPlayed ) {
+      mostPlayed = played;
+      bestMove = child->move;
     }
   }
-
+  
   *pv = bestMove;
 
   // Recursion
-  if( bestMove != PASS ){
-    Board_play( search->board, bestMove );
-    UCTSearch_getPv( search, pv+1 );
+  if( node->firstChild != NULL ){
+    UCTSearch_getPv( search, pv+1, node->firstChild );
   }
 }
 
@@ -134,7 +118,7 @@ void UCTSearch_printPv( UCTSearch* search )
 
   // Gets pv
   INTERSECTION pv[MAX_INTERSECTION_NUM];
-  UCTSearch_getPv( search, pv );
+  UCTSearch_getPv( search, pv, &search->tree->root );
   
   printf("#");
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
@@ -147,18 +131,13 @@ void UCTSearch_printPv( UCTSearch* search )
   printf("\n");
 }
 
-Color UCTSearch_playSimulation( UCTSearch* search )
+Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos )
 {
   Color winner;
 
-  // Probe current position
-  UCTNode* pos = HashTable_retrieve( search->hashTable, &search->board->hashKey );
-  if( !pos || pos->played == 0){
-    // Store the position and expand
-    if( !pos ){
-      pos = HashTable_insert( search->hashTable, &search->board->hashKey, &NEW_NODE );
-    }
-    UCTSearch_createChildren(search);
+  // If this position is terminal, expand
+  if( !pos->firstChild ){
+    UCTSearch_createChildren(search, pos);
 
     // Play random game
     winner = (*(search->policy))(search);
@@ -166,18 +145,18 @@ Color UCTSearch_playSimulation( UCTSearch* search )
   else{
 
     // Select UCT-RAVE best node
-    INTERSECTION move = UCTSearch_selectUCT(search, pos);
+    UCTNode* bestchild = UCTSearch_selectUCT(search, pos);
 
     // Go into child position
-    if( move == PASS ){
+    if( bestchild->move == PASS ){
       Board_pass( search->board );
     }
     else{
-      Board_play( search->board, move );
+      Board_play( search->board, bestchild->move );
     }
 
     // Recurse
-    winner = UCTSearch_playSimulation( search );
+    winner = UCTSearch_playSimulation( search, bestchild );
   }
 
   // Playout finished, update statistics
@@ -189,60 +168,46 @@ Color UCTSearch_playSimulation( UCTSearch* search )
   return winner;
 }
 
-void UCTSearch_createChildren( UCTSearch* search )
+void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos )
 {      
   //Board_print(search->board, stdout, 0, 0);
   //printf("Par: %016llx-%016llx\n", search->board->hashKey.key1, search->board->hashKey.key2);
 
   // Browses all legal children
-  HashKey child;
-  UCTNode* childNode;
+  //HashKey child;
+  UCTNode* childNode = NULL;
   foreach_empty(search->board){
     if( Board_isLegal( search->board, empty ) ){
-      Board_childHash( search->board, empty, &child );
-
-      // Probe child
-      childNode = HashTable_retrieve( search->hashTable, &child );
-      if( !childNode ){
-	childNode = HashTable_insert( search->hashTable, &child, &NEW_NODE );
-      }
-
-      // KILL ME
-      //printf("%d(%016llx-%016llx) ", emptyNode->intersection, child.key1, child.key2);
+      UCTNode* newNode = UCTTree_newNode( search->tree );
+      newNode->move = empty;
+      
+      // Add as first child or brother of prev node
+      if( childNode == NULL ) pos->firstChild = newNode;
+      else childNode->nextSibiling = newNode;
+      childNode = newNode;
     }
   }
 
   //printf("\n");
 }
 
-INTERSECTION UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
+UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
 {
   float bestUCT = 0.0f;
   INTERSECTION bestMove = PASS;
 
-  // Browses all legal children
+  // Browses all children of current position
   HashKey child;
-  UCTNode* childNode;
-  foreach_empty(search->board){
-    INTERSECTION intersection = search->board->empties[empty];
-    if( Board_isLegal( search->board, intersection ) ){
-      Board_childHash( search->board, intersection, &child );
-      
-      // Probe child
-      childNode = HashTable_retrieve( search->hashTable, &child );
-      
-      gauAssertMsg(childNode!=NULL, search->board, search,
-		   "Child not found:%d(%016llx-%016llx)\n", intersection, child.key1, child.key2);
-
-      float uctValue = UCTNode_evaluateUCT( childNode, pos, search->board->turn, search->UCTK );
-      if( uctValue > bestUCT ) {
-	bestUCT = uctValue;
-	bestMove = intersection;
-      }
+  UCTNode* bestChild = NULL;
+  foreach_child(pos){
+    float uctValue = UCTNode_evaluateUCT( child, pos, search->board->turn, search->UCTK );
+    if( uctValue > bestUCT ) {
+      bestUCT = uctValue;
+      bestChild = child;
     }
   }
 
-  return bestMove;
+  return bestChild;
 }
 
 float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCTK )

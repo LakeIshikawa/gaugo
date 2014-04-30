@@ -19,6 +19,9 @@ typedef struct Options
   /** Hash table size (bits) */
   int hashTableSize;
 
+  /** Number of nodes for a single pool of nodes in tree */
+  int treePoolNodeNum;
+
   /** komi */
   float komi;
 

@@ -14,7 +14,9 @@ int STOPPER_5ksim( UCTSearch* search, int simulations )
   //fgets( buf, 64, stdin );
 
   if( simulations % 3000 == 0 ){
-    //printf("Hash: %d ent(%f) / %d coll \n", search->hashTable->entriesNum, (float)search->hashTable->entriesNum/search->hashTable->mask, search->hashTable->firstKeyCollisions );
+    //printf("Hash: %d ent(%f) / %d coll \n", search->hashTable->entriesNum, 
+    //	   (float)search->hashTable->entriesNum/search->hashTable->mask,
+    //	   search->hashTable->firstKeyCollisions );
     //printf("End of sim: %d\n", simulations);
     
     // Prints pv
