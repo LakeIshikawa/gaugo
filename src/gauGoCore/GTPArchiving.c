@@ -30,24 +30,67 @@ void GTPArchiving_loadSGF( GauGoEngine* engine, int argc, char** argv )
   int size;
   sgfGetIntProperty( tree.lastnode, "SZ", &size );
 
-  Board_initialize( &engine->board, size );
+  engine->options.boardSize = size;
+  GauGoEngine_resetBoard( engine );
 
   // Read and play main variation
   while( sgftreeForward( &tree ) ){
     
     // Pass node
     if( is_pass_node( tree.lastnode, size ) ){
-      Board_pass( &engine->board );
+      GauGoEngine_play( engine, PASS );
     }
     
     else{
       assert( is_move_node( tree.lastnode ) );
-      INTERSECTION move = Board_intersection( 
-					     &engine->board, 
-					     get_moveY(tree.lastnode->props, size),
-					     get_moveX(tree.lastnode->props, size)
-					     );
-      Board_play( &engine->board, move );
+      INTERSECTION move = 
+	Board_intersection( 
+			   engine->board, 
+			   get_moveY(tree.lastnode->props, size),
+			   get_moveX(tree.lastnode->props, size)
+			    );
+      // SGF validation check
+      if( !Board_isLegal(engine->board, move) ){
+	GauGoEngine_sayError(BAD_DATA);
+      }
+      
+      // Must be able to play
+      GauGoEngine_play( engine, move );
     }
   }
+
+  // Success
+  GauGoEngine_saySuccess("");
+}
+
+void GTPArchiving_saveSGF( GauGoEngine* engine, int argc, char** argv )
+{
+  // Must have exactly 1 argument
+  if( argc != 2 ){
+    GauGoEngine_sayError( UNKOWN_COMMAND );
+    return;
+  }
+  
+  char* filename = argv[1];
+  
+  SGFTree tree;
+  tree.root = NULL;
+  tree.lastnode = NULL;
+  sgftreeCreateHeaderNode(&tree, engine->board->size, 6.5f, 0);
+
+  Color turn = BLACK;
+  for( int m=0; m<engine->historyLength-1; m++ ) {
+    INTERSECTION ints = engine->historyMoves[m];
+    sgftreeAddPlay(
+		   &tree, 
+		   turn, 
+		   Board_intersectionY(engine->board, ints), 
+		   Board_intersectionX(engine->board, ints)
+		   );
+    turn = turn==BLACK?WHITE:BLACK;
+  }
+  
+  writesgf(tree.root, argv[1]);
+
+  GauGoEngine_saySuccess("");
 }

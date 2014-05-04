@@ -19,16 +19,6 @@
 typedef struct StoneGroup
 {
   /**
-   * The set of intersections (stones) that belong to this group
-   **/
-  INTERSECTION intersections[MAX_INTERSECTION_NUM];
-
-  /**
-   * The set of intersection (empties) that are liberties of this group
-   **/
-  INTERSECTION liberties[MAX_INTERSECTION_NUM];
-
-  /**
    * The number of intersections (stones) that belong to this group
    **/
   short stonesNum;

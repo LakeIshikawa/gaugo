@@ -13,5 +13,9 @@
  **/
 void GTPArchiving_loadSGF( GauGoEngine* engine, int argc, char** argv );
 
+/**
+ * @brief Save current board position in sgf format (single variation)
+ **/
+void GTPArchiving_saveSGF( GauGoEngine* engine, int argc, char** argv );
 
 #endif

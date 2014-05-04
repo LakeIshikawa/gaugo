@@ -12,7 +12,7 @@ bin_PROGRAMS = gauGo gauGo2p
 AM_CPPFLAGS = -I$(top_srcdir)/src/gnugo/sgf
 
 #gauGo GTP engine
-gauGo_SOURCES = gauGoMain.c options.c gauGoEngine.c GTPBasicCommands.c GTPArchiving.c
+gauGo_SOURCES = gauGoMain.c options.c gauGoEngine.c GTPBasicCommands.c GTPArchiving.c GTPSynching.c
 gauGo_LDADD = libgauGoCore.a $(top_srcdir)/build/src/gnugo/sgf/libsgf.a -lm
 
 # gauGo 2-players

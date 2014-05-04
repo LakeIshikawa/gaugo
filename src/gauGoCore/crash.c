@@ -83,7 +83,7 @@ void _gauAssertPvt(int exp, struct Board* board, struct UCTSearch* tree,
   // Print the board if available
   if( board != NULL ){
     fprintf(logFile, "------ BOARD INFO -----\n");
-    Board_print(board, logFile, 1, 1);
+    Board_print(board, logFile, 1);
     fprintf(logFile, "------\\BOARD INFO -----\n\n");
   }
 

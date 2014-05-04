@@ -13,6 +13,8 @@
 #include "board.h"
 #include "options.h"
 
+#define HISTORY_LENGTH_MAX 512
+
 /**
  * @brief GTP errors
  *
@@ -24,6 +26,8 @@ typedef enum GTPError
     WRONG_COLOR,
     INVALID_SIZE,
     FILE_NOT_FOUND,
+    
+    BAD_DATA
 
   } GTPError;
 
@@ -33,8 +37,14 @@ typedef enum GTPError
  **/
 typedef struct GauGoEngine
 {
-  /** The go board */
-  Board board;
+  /** The current go board */
+  Board* board;
+
+  /** History */
+  Board history[HISTORY_LENGTH_MAX];
+  INTERSECTION historyMoves[HISTORY_LENGTH_MAX];
+  int historyLength;
+  int currentHistoryPos;
 
   /** Options */
   Options options;
@@ -51,6 +61,13 @@ typedef struct GauGoEngine
 int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv );
 
 /**
+ * @brief Reset engine board and history to initial position
+ *
+ * @param engine The engine
+ **/
+void GauGoEngine_resetBoard( GauGoEngine* engine );
+
+/**
  * @brief Processes a received GTP command
  *
  * @param engine The engine
@@ -58,6 +75,24 @@ int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv );
  * @param argc command's arguments
  **/
 void GauGoEngine_receiveGTPCommand( GauGoEngine* engine, int argc, char** argv );
+
+/**
+ * @brief Play a move to the engine's board.
+ * This method also saves current position in history, so that the 
+ * move can be undone later on
+ *
+ * @param engine The engine
+ * @param move The move
+ **/
+void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move);
+
+/**
+ * @brief Undo last move if possible
+ *
+ * @param engine The engine
+ * @return 1-undo succeeded 0-no moves to undo(now at root)
+ **/
+int GauGoEngine_undo(GauGoEngine* engine);
 
 /**
  * @brief Send GTP error response to stdout

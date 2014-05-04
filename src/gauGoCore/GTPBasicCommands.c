@@ -48,34 +48,36 @@ void GTPBasicCommands_play( GauGoEngine* engine, int argc, char** argv )
 
   // Checek color
   if( ! ( ((strcmp( argv[1], "w" ) == 0 || (strcmp( argv[1], "W" ) == 0)) 
-	   && engine->board.turn == WHITE)
+	   && engine->board->turn == WHITE)
 	  || ((strcmp( argv[1], "b" ) == 0 || (strcmp( argv[1], "B" ) == 0)) 
-	      && engine->board.turn == BLACK) ) ) {
+	      && engine->board->turn == BLACK) ) ) {
     GauGoEngine_sayError( WRONG_COLOR );
     return;
   }
 
   // Check for the pass move
   if( strcmp( argv[2], "pass" ) == 0 || strcmp( argv[2], "PASS" ) == 0 ){
-    Board_pass( &engine->board );
+    // Pass
+    GauGoEngine_play(engine, PASS);
     GauGoEngine_saySuccess("");
     return;
   }
 
   // Check move legality
-  if( strlen( argv[2] ) != 2 ){
+  int arglen = strlen( argv[2] );
+  if( arglen < 2 || arglen > 3){
     GauGoEngine_sayError( ILLEGAL_MOVE );
     return;
   }
 
-  INTERSECTION move = Board_intersectionFromName( &engine->board, argv[2] );
-  if( move == -1 || !Board_isLegal( &engine->board, move ) ){
+  INTERSECTION move = Board_intersectionFromName( engine->board, argv[2] );
+  if( move == -1 || !Board_isLegal( engine->board, move ) ){
     GauGoEngine_sayError( ILLEGAL_MOVE );
     return;
   }
 
-  // Play move
-  Board_play( &engine->board, move );
+  // Play the move
+  GauGoEngine_play(engine, move);
   GauGoEngine_saySuccess("");
 }
 
@@ -89,9 +91,9 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
 
   // If no legal moves to play, play pass without thinking
   BoardIterator it;
-  Board_iterator( &engine->board, &it );
-  if( Board_mustPass( &engine->board, &it ) ){
-    Board_pass( &engine->board );
+  Board_iterator( engine->board, &it );
+  if( Board_mustPass( engine->board, &it ) ){
+    GauGoEngine_play(engine, PASS);
     GauGoEngine_saySuccess("pass");
     return;
   }
@@ -102,7 +104,7 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
 
   // UCT search
   UCTSearch search;
-  UCTSearch_initialize( &search, &engine->board, &tree, &POLICY_pureRandom, 
+  UCTSearch_initialize( &search, engine->board, &tree, &POLICY_pureRandom, 
 			&STOPPER_5ksim, &engine->options );
   INTERSECTION move = UCTSearch_search( &search );
 
@@ -113,15 +115,15 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
 
   char moveStr[5] = { '\0' };
   if( move == PASS ){
-    Board_pass( &engine->board );
+    GauGoEngine_play(engine, PASS);
     strcpy(moveStr, "pass");
   }
   else{
-    gauAssert( Board_isLegal( &engine->board, move ), &engine->board, NULL );
+    gauAssert( Board_isLegal( engine->board, move ), engine->board, NULL );
     
     // Play move
-    Board_play( &engine->board, move );
-    Board_intersectionName( &engine->board, move, moveStr );
+    GauGoEngine_play(engine, move);
+    Board_intersectionName( engine->board, move, moveStr );
   }
   
   UCTTree_delete( &tree );
@@ -130,7 +132,7 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
 
 void GTPBasicCommands_undo( GauGoEngine* engine, int argc, char** argv )
 {
-  // TODO
+  GauGoEngine_undo( engine );
   GauGoEngine_saySuccess("");
 }
 
@@ -143,7 +145,7 @@ void GTPBasicCommands_quit( GauGoEngine* engine, int argc, char** argv )
 void GTPBasicCommands_printboard( GauGoEngine* engine, int argc, char** argv )
 {
   printf("= ");
-  Board_print( &engine->board, stdout, 0, 0 );
+  Board_print( engine->board, stdout, 0 );
   printf("\n");
   fflush(stdout);
 }
@@ -162,7 +164,7 @@ void GTPBasicCommands_boardsize( GauGoEngine* engine, int argc, char** argv )
   }
   
   engine->options.boardSize = size;
-  Board_initialize( &engine->board, engine->options.boardSize );
+  GauGoEngine_resetBoard( engine );
   GauGoEngine_saySuccess("");
 }
 
@@ -180,6 +182,6 @@ void GTPBasicCommands_komi( GauGoEngine* engine, int argc, char** argv )
 
 void GTPBasicCommands_clearboard( GauGoEngine* engine, int argc, char** argv )
 {
-  Board_initialize( &engine->board, engine->options.boardSize );
+  GauGoEngine_resetBoard( engine );
   GauGoEngine_saySuccess("");
 }

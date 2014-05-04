@@ -58,22 +58,10 @@ typedef struct BoardIterator
  **/
 typedef struct Board
 {
-
   /**
-   * The size of the board's side
+   * Board's double-hash key
    **/
-  unsigned char size;
-
-  /**
-   * Table of offsets used to compute neighbourgh
-   * intersection index in all possible directions {N, E, S, W}
-   **/
-  signed char directionOffsets[4];
-
-  /**
-   * The map of intersections
-   **/
-  Color intersectionMap[MAX_INTERSECTION_NUM];
+  HashKey hashKey;
 
   /**
    * The pool of StoneGroup resources.
@@ -83,10 +71,10 @@ typedef struct Board
   StoneGroup groups[MAX_STONEGROUPS];
 
   /**
-   * Index of the first available (uninitialized) group in groups
+   * The map of intersections
    **/
-  GRID firstAvailableGroup;
-
+  Color intersectionMap[MAX_INTERSECTION_NUM];
+  
   /**
    * The map from coordinates to stoneGroups index.
    * For every intersection, the pool index of the group to which it 
@@ -95,16 +83,10 @@ typedef struct Board
   GRID groupMap[MAX_INTERSECTION_NUM];
 
   /**
-   * The map from intersection coordinates to the groups (max 4)
-   * to which that intersection is a liberty.
-   **/
-  GRID libertyMap[MAX_INTERSECTION_NUM][4];
-
-  /**
    * List of empty squares
    **/
   short empties[MAX_INTERSECTION_NUM];
-
+  
   /**
    * Number of empty squares
    **/
@@ -131,9 +113,20 @@ typedef struct Board
   INTERSECTION koPosition;
 
   /**
-   * Board's double-hash key
+   * The size of the board's side
    **/
-  HashKey hashKey;
+  unsigned char size;
+
+  /**
+   * Table of offsets used to compute neighbourgh
+   * intersection index in all possible directions {N, E, S, W}
+   **/
+  signed char directionOffsets[4];
+
+  /**
+   * Index of the first available (uninitialized) group in groups
+   **/
+  GRID firstAvailableGroup;
 
 } Board;
 
@@ -161,16 +154,6 @@ typedef struct Board
  *
  **/
 #define foreach_neigh(board, intersection) for(int i=0, neigh=intersection+board->directionOffsets[0]; i<4; neigh=intersection+board->directionOffsets[++i] )
-
-/**
- * @brief Utility to loop over the groups mapped as holders of an 
- * intersection as liberty.  That is, browse though all the groups who
- * have the specified intersection as a liberty.
- *
- * Variable 'grit' can be used in the loop to refer to the current group
- * being browsed.
- **/
-#define foreach_libgroup(board, intersection) GRID grit=board->libertyMap[intersection][0]; for(int i=0; i<4 && (grit!=NULL_GROUP); grit=board->libertyMap[intersection][++i] )
 
 #define foreach_empty(board) INTERSECTION empty=board->empties[0]; for(int i=0; i<board->emptiesNum; empty=board->empties[++i])
 
@@ -268,18 +251,6 @@ void Board_play(Board* board, INTERSECTION intersection);
 void Board_playEmpty(Board* board, int emptyId);
 
 /**
- * @brief Calculates the hash-value of the child position of specified board
- * after the specified intersection would be played, without actually playing the move.
- * The board is guaranteed not to be modified.
- *
- * @param board The board to play on
- * @param intersection The intersection to virtually play on
- * @param outChildHash The hash value of the board after intersection would be played
- *
- **/
-void Board_childHash(Board* board, INTERSECTION intersection, HashKey* outChildHash);
-
-/**
  * @brief Plays a pass move on the specified board, which results
  * in swapping the turn's color.
  *
@@ -313,9 +284,8 @@ void Board_iterator(Board* board, BoardIterator* iterator);
  * @param board The board to print
  * @param stream The stream to print to
  * @param withGroupInfo Prints debug groups informations as well
- * @param withLibertyMap Prints liberty map info as well
  **/
-void Board_print(Board* board, FILE* stream, int withGroupInfo, int withLibertyMap);
+void Board_print(Board* board, FILE* stream, int withGroupInfo);
 
 /**
  * @brief Obtains a readable name of the specified intersection on the 

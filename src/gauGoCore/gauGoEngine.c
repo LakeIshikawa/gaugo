@@ -9,6 +9,7 @@
 #include "gauGoEngine.h"
 #include "GTPBasicCommands.h"
 #include "GTPArchiving.h"
+#include "GTPSynching.h"
 
 /**
  * @brief GTP command processor function type
@@ -43,6 +44,11 @@ CmdAndProcessor commandProcessors[] = {
 
   // Archiving
   { "load", &GTPArchiving_loadSGF },
+  { "save", &GTPArchiving_saveSGF },
+
+  // Synching
+  { "board", &GTPSynching_board },
+
   { NULL, NULL }
 };
 
@@ -52,8 +58,7 @@ int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv )
   // Parses command-line options
   Options_initialize( &engine->options, argc, argv );
 
-  // Initializes the board
-  Board_initialize( &engine->board, engine->options.boardSize );
+  GauGoEngine_resetBoard( engine );
 
   // Randomize
   srand( time(NULL) );
@@ -61,6 +66,53 @@ int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv )
   return 1;
 }
 
+void GauGoEngine_resetBoard( GauGoEngine* engine )
+{
+  // Empty history
+  engine->historyLength = 1;
+  engine->currentHistoryPos = 0;
+  engine->board = &engine->history[0];
+
+  // Initializes the board
+  Board_initialize( engine->board, engine->options.boardSize );
+}
+
+void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move)
+{
+  // If the redo is possible
+  if( engine->currentHistoryPos < engine->historyLength-1 ) {
+    
+    // If the move is the redo move, redo it
+    if( move == engine->historyMoves[engine->currentHistoryPos] ) {
+      // Redo
+      engine->board = &engine->history[engine->currentHistoryPos++];
+      return;
+    }
+    else{
+      // Destroy all redo positions, and start a new branch
+      engine->historyLength = engine->currentHistoryPos+1;
+    }
+  }
+
+  // Save current position
+  engine->history[ engine->historyLength++ ] = *engine->board;
+  engine->historyMoves[ engine->currentHistoryPos++ ] = move;
+  engine->board = &engine->history[ engine->currentHistoryPos ];
+
+  // Play the move
+  if( move == PASS ) Board_pass( engine->board );
+  else Board_play( engine->board, move );
+}
+
+int GauGoEngine_undo(GauGoEngine* engine)
+{
+  if( engine->currentHistoryPos == 0 ) return 0;
+
+  // Undo
+  engine->board = &engine->history[--engine->currentHistoryPos];
+
+  return 1;
+}
 
 void GauGoEngine_receiveGTPCommand( GauGoEngine* engine, int argc, char** argv )
 {
@@ -96,6 +148,7 @@ void GauGoEngine_sayError(GTPError error)
   case WRONG_COLOR:  printf("? wrong color\n\n"); break;
   case INVALID_SIZE:  printf("? invalid size\n\n"); break;
   case FILE_NOT_FOUND:  printf("? file not found\n\n"); break;
+  case BAD_DATA: printf("? bad data\n\n"); break;
   }
 
   fflush(stdout);
