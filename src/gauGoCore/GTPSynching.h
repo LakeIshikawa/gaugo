@@ -13,5 +13,4 @@
  **/
 void GTPSynching_board( GauGoEngine* engine, int argc, char** argv );
 
-
 #endif

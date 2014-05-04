@@ -85,7 +85,7 @@ void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move)
     // If the move is the redo move, redo it
     if( move == engine->historyMoves[engine->currentHistoryPos] ) {
       // Redo
-      engine->board = &engine->history[engine->currentHistoryPos++];
+      engine->board = &engine->history[++engine->currentHistoryPos];
       return;
     }
     else{
@@ -94,7 +94,7 @@ void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move)
     }
   }
 
-  // Save current position
+  // Copy current position
   engine->history[ engine->historyLength++ ] = *engine->board;
   engine->historyMoves[ engine->currentHistoryPos++ ] = move;
   engine->board = &engine->history[ engine->currentHistoryPos ];
