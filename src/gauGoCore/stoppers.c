@@ -6,6 +6,10 @@
 
 #include "stoppers.h"
 
+void printTreeInfo( UCTSearch* search )
+{
+}
+
 int STOPPER_5ksim( UCTSearch* search, int simulations )
 {
   // TEST
@@ -22,7 +26,6 @@ int STOPPER_5ksim( UCTSearch* search, int simulations )
     // Prints pv
     UCTSearch_printPv( search );
     
-
     fflush(stdout);
   }
   return simulations >= 15000;

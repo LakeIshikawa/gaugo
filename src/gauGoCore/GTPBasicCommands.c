@@ -99,12 +99,16 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
   }
 
   // Initializes new empty tree
-  UCTTree tree;
-  UCTTree_initialize( &tree, engine->options.treePoolNodeNum );
+  UCTTree_delete( &engine->lastTree );
+  UCTTree_initialize( 
+		     &engine->lastTree, 
+		     engine->options.treePoolNodeNum,
+		     engine->board);
 
   // UCT search
   UCTSearch search;
-  UCTSearch_initialize( &search, engine->board, &tree, &POLICY_pureRandom, 
+  UCTSearch_initialize( &search, engine->board, 
+			&engine->lastTree, &POLICY_pureRandom, 
 			&STOPPER_5ksim, &engine->options );
   INTERSECTION move = UCTSearch_search( &search );
 
@@ -126,13 +130,18 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
     Board_intersectionName( engine->board, move, moveStr );
   }
   
-  UCTTree_delete( &tree );
   GauGoEngine_saySuccess(moveStr);
 }
 
 void GTPBasicCommands_undo( GauGoEngine* engine, int argc, char** argv )
 {
   GauGoEngine_undo( engine );
+  GauGoEngine_saySuccess("");
+}
+
+void GTPBasicCommands_redo( GauGoEngine* engine, int argc, char** argv )
+{
+  GauGoEngine_redo( engine );
   GauGoEngine_saySuccess("");
 }
 

@@ -14,13 +14,8 @@
 // Private methods 
 
 /**
- * @brief Evaluate a node based on its UCT-RAVE values (UCB standard formula extended with RAVE)
- * A node with no direct visits is always given maximum value
- **/
-float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCTK);
-
-/**
- * @brief Finds the UCT-RAVE best node in current tree, performs a playout from that node,
+ * @brief Finds the UCT-RAVE best node in current tree, 
+ * performs a playout from that node,
  * and updates hashTable with result and RAVE informations.
  *
  * @param search The search
@@ -30,7 +25,8 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCT
 Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node );
 
 /**
- * @brief Select the UCT-best children of speficied node 'pos', for the current turn player.
+ * @brief Select the UCT-best children of speficied node 'pos', 
+ * for the current turn player.
  *
  * @param search The search
  * @param pos The parent position
@@ -91,15 +87,17 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
 void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node )
 {
   // Select most visited move from root
-  int mostPlayed = 0;
+  int mostPlayed = -1;
   INTERSECTION bestMove = PASS;
-  
+  UCTNode* bestChild = NULL;
+
   // Browses all children
   foreach_child( node ){
     int played = child->played;
     if( played > mostPlayed ) {
       mostPlayed = played;
       bestMove = child->move;
+      bestChild = child;
     }
   }
   
@@ -107,7 +105,7 @@ void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node )
 
   // Recursion
   if( node->firstChild != NULL ){
-    UCTSearch_getPv( search, pv+1, node->firstChild );
+    UCTSearch_getPv( search, pv+1, bestChild );
   }
 }
 
@@ -170,25 +168,20 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos )
 
 void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos )
 {      
-  //Board_print(search->board, stdout, 0, 0);
-  //printf("Par: %016llx-%016llx\n", search->board->hashKey.key1, search->board->hashKey.key2);
-
   // Browses all legal children
   //HashKey child;
   UCTNode* childNode = NULL;
   foreach_empty(search->board){
-    if( Board_isLegal( search->board, empty ) ){
+    if( Board_isLegalNoEyeFilling( search->board, empty ) ){
       UCTNode* newNode = UCTTree_newNode( search->tree );
       newNode->move = empty;
-      
+
       // Add as first child or brother of prev node
       if( childNode == NULL ) pos->firstChild = newNode;
       else childNode->nextSibiling = newNode;
       childNode = newNode;
     }
   }
-
-  //printf("\n");
 }
 
 UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
@@ -200,7 +193,11 @@ UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
   HashKey child;
   UCTNode* bestChild = NULL;
   foreach_child(pos){
-    float uctValue = UCTNode_evaluateUCT( child, pos, search->board->turn, search->UCTK );
+    float uctValue = UCTNode_evaluateUCT( 
+					 child, 
+					 pos, 
+					 search->board->turn, 
+					 search->UCTK );
     if( uctValue > bestUCT ) {
       bestUCT = uctValue;
       bestChild = child;

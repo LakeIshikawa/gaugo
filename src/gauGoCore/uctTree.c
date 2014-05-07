@@ -15,17 +15,26 @@
 int UCTTree_grow( UCTTree* tree )
 {
   if( tree->poolsNum >= MAX_POOLS ) return 0; 
-  return MemoryPool_initialize(&tree->pools[tree->poolsNum++], tree->poolSize, sizeof(UCTNode));
+  return MemoryPool_initialize(
+			       &tree->pools[tree->poolsNum++], 
+			       tree->poolSize, 
+			       sizeof(UCTNode));
 }
 
 
-void UCTTree_initialize( UCTTree* tree, int poolSize )
+void UCTTree_initialize( UCTTree* tree, int poolSize, Board* board )
 {
+  UCTTree_initializeEmpty( tree );
   tree->poolSize = poolSize;
+  memcpy(&tree->rootHash, &board->hashKey, sizeof(HashKey));
+  UCTTree_grow( tree );
+}
+
+void UCTTree_initializeEmpty( UCTTree* tree )
+{
   tree->poolsNum = 0;
   UCTNode_initialize(&tree->root);
-
-  UCTTree_grow( tree );
+  memset(&tree->rootHash, 0, sizeof(HashKey));
 }
 
 void UCTTree_delete( UCTTree* tree )

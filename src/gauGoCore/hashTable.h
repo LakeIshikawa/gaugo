@@ -87,5 +87,13 @@ void* HashTable_insert(HashTable* table, HashKey* key, void* data);
  **/
 void* HashTable_retrieve(HashTable* table, HashKey* key);
 
+/**
+ * @brief Test 2 hash keys for equality
+ *
+ * @param key1 First key
+ * @param key2 Second key
+ * @param return Equality
+ **/
+int HashKey_compare(HashKey* key1, HashKey* key2);
 
 #endif

@@ -13,4 +13,11 @@
  **/
 void GTPSynching_board( GauGoEngine* engine, int argc, char** argv );
 
+/**
+ * @brief Outputs ucttree nodes information about current position's
+ * childrens, if any ucttree is available (i.e. if a previous genmove 
+ * exists)
+ **/
+void GTPSynching_ucttree( GauGoEngine* engine, int argc, char** argv );
+
 #endif

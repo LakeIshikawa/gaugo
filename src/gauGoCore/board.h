@@ -214,9 +214,19 @@ int Board_intersectionY(Board* board, INTERSECTION intersection);
  * @brief Determines if playing on the specified intersection is legal
  *
  * @param board The board to play on 
- * param intersection The intersection to play on
+ * @param intersection The intersection to play on
  **/
 int Board_isLegal(Board* board, INTERSECTION intersection);
+
+/**
+ * @brief Determines if the specified move is legal and not
+ * self-eye filling.  It is ok to fill self false eyes if at
+ * least one of the surrounding groups is in atari
+ *
+ * @param board The board
+ * @param intersection The intersection to play on
+ **/
+int Board_isLegalNoEyeFilling(Board* board, INTERSECTION intersection);
 
 /**
  * @brief Determines wether the next move for current turn's player 

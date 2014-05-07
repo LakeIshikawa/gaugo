@@ -33,6 +33,7 @@ CmdAndProcessor commandProcessors[] = {
   { "play", &GTPBasicCommands_play },
   { "genmove", &GTPBasicCommands_genmove },
   { "undo", &GTPBasicCommands_undo },
+  { "redo", &GTPBasicCommands_redo },
   { "quit", &GTPBasicCommands_quit },
   { "komi", &GTPBasicCommands_komi },
   { "showboard", &GTPBasicCommands_printboard },
@@ -48,6 +49,7 @@ CmdAndProcessor commandProcessors[] = {
 
   // Synching
   { "board", &GTPSynching_board },
+  { "ucttree", &GTPSynching_ucttree },
 
   { NULL, NULL }
 };
@@ -58,6 +60,7 @@ int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv )
   // Parses command-line options
   Options_initialize( &engine->options, argc, argv );
 
+  // Init board
   GauGoEngine_resetBoard( engine );
 
   // Randomize
@@ -75,18 +78,56 @@ void GauGoEngine_resetBoard( GauGoEngine* engine )
 
   // Initializes the board
   Board_initialize( engine->board, engine->options.boardSize );
+
+  // Init tree to empty
+  UCTTree_initializeEmpty(&engine->lastTree);
+}
+
+UCTNode* GauGoEngine_getTreePos( GauGoEngine* engine )
+{
+  // If no tree, no position
+  if( engine->lastTree.root.firstChild == NULL ) return NULL;
+
+  // Search for root in history
+  UCTNode* position = &engine->lastTree.root;
+  int rootFound = 0;
+  int i;
+  for( i=0; i<engine->currentHistoryPos+1; i++ ){
+    
+    // Remember root when found
+    if( HashKey_compare(&engine->history[i].hashKey, 
+			&engine->lastTree.rootHash )) {
+      rootFound = 1;
+    }
+
+    // Descend if root present
+    else if( rootFound ){
+      foreach_child(position){
+	if( child->move == engine->historyMoves[i-1] ){
+	  position = child;
+	  break;
+	}
+      }
+    }
+  }
+
+  // No root no pos
+  if( !rootFound ) return NULL;
+
+  return position;
 }
 
 void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move)
 {
   // If the redo is possible
+  int redone = 0;
   if( engine->currentHistoryPos < engine->historyLength-1 ) {
     
     // If the move is the redo move, redo it
     if( move == engine->historyMoves[engine->currentHistoryPos] ) {
       // Redo
-      engine->board = &engine->history[++engine->currentHistoryPos];
-      return;
+      redone = 1;
+      GauGoEngine_redo(engine);
     }
     else{
       // Destroy all redo positions, and start a new branch
@@ -94,24 +135,37 @@ void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move)
     }
   }
 
-  // Copy current position
-  engine->history[ engine->historyLength++ ] = *engine->board;
-  engine->historyMoves[ engine->currentHistoryPos++ ] = move;
-  engine->board = &engine->history[ engine->currentHistoryPos ];
-
-  // Play the move
-  if( move == PASS ) Board_pass( engine->board );
-  else Board_play( engine->board, move );
+  if( !redone ){
+    // Copy current position
+    engine->history[ engine->historyLength++ ] = *engine->board;
+    engine->historyMoves[ engine->currentHistoryPos++ ] = move;
+    engine->board = &engine->history[ engine->currentHistoryPos ];
+    
+    // Play the move
+    if( move == PASS ) Board_pass( engine->board );
+    else Board_play( engine->board, move );
+  }
 }
 
 int GauGoEngine_undo(GauGoEngine* engine)
 {
   if( engine->currentHistoryPos == 0 ) return 0;
 
-  // Undo
+  // Undo board
   engine->board = &engine->history[--engine->currentHistoryPos];
 
   return 1;
+}
+
+int GauGoEngine_redo(GauGoEngine* engine)
+{
+  // Redo board
+  if( engine->currentHistoryPos < engine->historyLength-1 ) {
+    engine->board = &engine->history[++engine->currentHistoryPos];
+    return 1;
+  }
+
+  return 0;
 }
 
 void GauGoEngine_receiveGTPCommand( GauGoEngine* engine, int argc, char** argv )
@@ -167,7 +221,7 @@ void GauGoEngine_saySuccess(char* response)
 
 void GauGoEngine_printCommandList(FILE* stream, char* format)
 {
-    CmdAndProcessor* it;
+  CmdAndProcessor* it;
   for( it = commandProcessors; it->commandName; it++ ){
     fprintf(stream, format, it->commandName);
   }

@@ -7,6 +7,7 @@
 #define UCTTREE_H
 
 #include "board.h"
+#include "hashTable.h"
 #include "memoryPool.h"
 
 /**
@@ -19,8 +20,10 @@
  **/
 typedef struct UCTNode
 {
-  /** Intersection to identify the move represented by this node*/
-  INTERSECTION move;
+  /** First child */
+  struct UCTNode* firstChild;
+  /** Next sibiling */
+  struct UCTNode* nextSibiling;
 
   /** Wins as first move of playout */
   int winsBlack;
@@ -31,11 +34,9 @@ typedef struct UCTNode
   int AMAFwinsBlack;
   /** Playouts as not first move */
   int AMAFplayed;
-
-  /** First child */
-  struct UCTNode* firstChild;
-  /** Next sibiling */
-  struct UCTNode* nextSibiling;
+  
+  /** Intersection to identify the move represented by this node*/
+  INTERSECTION move;
   
 } UCTNode;
 
@@ -59,6 +60,8 @@ typedef struct UCTTree
 
   // The root of the tree
   UCTNode root;
+  // The root board hash (the position this tree belongs to)
+  HashKey rootHash;
 
 } UCTTree;
 
@@ -76,8 +79,18 @@ typedef struct UCTTree
  *
  * @brief tree The tree to initialize
  * @brief poolSize The size in elements of a single pool
+ * @brief rootPos The root's board position (the hash key will be stored)
  **/
-void UCTTree_initialize( UCTTree* tree, int poolSize );
+void UCTTree_initialize( UCTTree* tree, int poolSize, Board* rootPos );
+
+/**
+ * @brief Initializes without allocating a pool size (for using as an empty tree)
+ * No nodes can be added to this tree until UCTTree_delete, UCTTree_initialize
+ * are called
+ *
+ * @param tree The tree
+ **/
+void UCTTree_initializeEmpty( UCTTree* tree );
 
 /**
  * @brief Release all resources related to the tree.
@@ -103,5 +116,18 @@ UCTNode* UCTTree_newNode( UCTTree* tree );
  * @param node The node to initialize
  **/
 void UCTNode_initialize( UCTNode* node );
+
+/**
+ * @brief Evaluate a node based on its UCT-RAVE values 
+ * (UCB standard formula extended with RAVE)
+ * A node with no direct visits is always given maximum value
+ *
+ * @param node The node to evaluate UCT value
+ * @param parent The parent of 'node'
+ * @param turn Turn color at node
+ * @param UCTK UCT constant
+ **/
+float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, 
+			   Color turn, float UCTK);
 
 #endif

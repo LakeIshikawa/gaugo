@@ -11,6 +11,7 @@
 #define GAUGO_ENGINE_H
 
 #include "board.h"
+#include "uctTree.h"
 #include "options.h"
 
 #define HISTORY_LENGTH_MAX 512
@@ -46,6 +47,9 @@ typedef struct GauGoEngine
   int historyLength;
   int currentHistoryPos;
 
+  /** Last search tree */
+  UCTTree lastTree;
+
   /** Options */
   Options options;
 
@@ -66,6 +70,15 @@ int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv );
  * @param engine The engine
  **/
 void GauGoEngine_resetBoard( GauGoEngine* engine );
+
+/**
+ * @brief Gets current poisition in tree if available
+ *
+ * @param engine The engine
+ * @return The UCT node corresponding to current position 
+ * if any, NULL otherwise
+ **/
+UCTNode* GauGoEngine_getTreePos( GauGoEngine* engine );
 
 /**
  * @brief Processes a received GTP command
@@ -93,6 +106,14 @@ void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move);
  * @return 1-undo succeeded 0-no moves to undo(now at root)
  **/
 int GauGoEngine_undo(GauGoEngine* engine);
+
+/**
+ * @brief Redo last undo move if any
+ *
+ * @param engine The engine
+ * @return 1-redo succeeded 0-no moves to redo
+ **/
+int GauGoEngine_redo(GauGoEngine* engine);
 
 /**
  * @brief Send GTP error response to stdout

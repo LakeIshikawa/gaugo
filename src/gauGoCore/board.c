@@ -195,7 +195,7 @@ int Board_intersectionY(Board* board, INTERSECTION intersection)
 Color Board_getColor(Board* board, INTERSECTION intersection)
 {
   gauAssert( intersection >= 0 
-	     && (intersection == || intersection < MAX_INTERSECTION_NUM),
+	     && (intersection == PASS || intersection < MAX_INTERSECTION_NUM),
 	     board, NULL);
   return board->intersectionMap[intersection];
 }
@@ -235,6 +235,21 @@ int Board_isLegal(Board* board, INTERSECTION intersection)
   }
 
   // None of a) b) c) holds, therefore the move should be suicide
+  return 0;
+}
+
+int Board_isLegalNoEyeFilling(Board* board, INTERSECTION intersection)
+{
+  if( !Board_isLegal( board, intersection ) ) return 0;
+
+  foreach_neigh( board, intersection ){
+    Color nc = Board_getColor( board, neigh );
+    if( nc == EMPTY || nc == !board->turn ) return 1;
+
+    // If self stone in atari, its OK to fill eye
+    if( STONE_GROUP( board->groupMap[neigh] )->libertiesNum == 1 ) return 1;
+  }
+
   return 0;
 }
 
@@ -328,7 +343,9 @@ void Board_playEmpty(Board* board, int emptyId)
     
     
     // If only 1 stone was capture, set the ko
-    if( capturedStones == 1 ){
+    // only if placed stone's group has only 1 stone!
+    if( capturedStones == 1 
+	&& board->groups[unifiedGroup].stonesNum == 1){
       Board_setKoPosition(board, koPosition);
     }
   }

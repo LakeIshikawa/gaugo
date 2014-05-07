@@ -50,6 +50,11 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv );
 void GTPBasicCommands_undo( GauGoEngine* engine, int argc, char** argv );
 
 /**
+ * @brief Redoes last undone move
+ **/
+void GTPBasicCommands_redo( GauGoEngine* engine, int argc, char** argv );
+
+/**
  * @brief Exists the program
  **/
 void GTPBasicCommands_quit( GauGoEngine* engine, int argc, char** argv );

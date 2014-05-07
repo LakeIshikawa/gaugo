@@ -14,17 +14,7 @@
  **/
 int pureRandom_isPlayableMove( Board* board, INTERSECTION move )
 {
-  if( !Board_isLegal( board, move ) ) return 0;
-
-  foreach_neigh( board, move ){
-    Color nc = Board_getColor( board, neigh );
-    if( nc == EMPTY || nc == !board->turn ) return 1;
-
-    // If self stone in atari, its OK to fill eye
-    if( STONE_GROUP( board->groupMap[neigh] )->libertiesNum == 1 ) return 1;
-  }
-
-  return 0;
+  return Board_isLegalNoEyeFilling( board, move );
 }
 
 /**

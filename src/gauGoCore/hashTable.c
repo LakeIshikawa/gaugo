@@ -11,7 +11,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
-void HashTable_initialize(HashTable* table, int maskSizeBits, int bucketSizeBytes)
+void HashTable_initialize(HashTable* table, int maskSizeBits, 
+			  int bucketSizeBytes)
 {
   // Set properties
   table->maskSizeBits = maskSizeBits;
@@ -88,4 +89,9 @@ void* HashTable_retrieve(HashTable* table, HashKey* key)
 
     i++;
   }
+}
+
+int HashKey_compare(HashKey* key1, HashKey* key2)
+{
+  return key1->key1 == key2->key1 && key1->key2 == key2->key2;
 }

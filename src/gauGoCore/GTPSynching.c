@@ -40,3 +40,27 @@ void GTPSynching_board( GauGoEngine* engine, int argc, char** argv )
   printf("\n\n");
   fflush(stdout);
 }
+
+void GTPSynching_ucttree( GauGoEngine* engine, int argc, char** argv )
+{
+  printf("= ");
+  
+  UCTNode* pos = GauGoEngine_getTreePos( engine );
+  if( pos ){
+    foreach_child( pos ){
+      char intName[4];
+      Board_intersectionName( engine->board, child->move, intName );
+      printf( "%s/%d/%d/%d/%d/%f,", 
+	      intName, 
+	      child->winsBlack, 
+	      child->played,
+	      child->AMAFwinsBlack,
+	      child->AMAFplayed,
+	      UCTNode_evaluateUCT( child, pos, !engine->board->turn, 0.44f )
+	      );
+    }
+  }
+
+  printf("\n\n");
+  fflush(stdout);
+}
