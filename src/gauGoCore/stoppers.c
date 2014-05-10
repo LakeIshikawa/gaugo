@@ -28,6 +28,6 @@ int STOPPER_5ksim( UCTSearch* search, int simulations )
     
     fflush(stdout);
   }
-  return simulations >= 15000;
+  return simulations >= 150000;
 }
 

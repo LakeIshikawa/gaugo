@@ -50,7 +50,7 @@ INTERSECTION pureRandom_playRandom(Board* board)
   return PASS;
 }
 
-Color POLICY_pureRandom( UCTSearch* search )
+Color POLICY_pureRandom( UCTSearch* search, unsigned char* playedMoves )
 {
   int passed = 0;
   while( 1 ){
@@ -64,6 +64,9 @@ Color POLICY_pureRandom( UCTSearch* search )
       passed = 1;
     } else {
       passed = 0;
+
+      // Mark the move as played
+      playedMoves[move] |= (!search->board->turn)+1;
     }
   }
 }

@@ -71,6 +71,11 @@ typedef struct UCTTree
  **/
 #define foreach_child(node) for(UCTNode* child=node->firstChild; child; child=child->nextSibiling)
 
+/**
+ * @brief Macro to browse all sibilings of a specified node
+ **/
+#define foreach_sibiling(node) for(UCTNode* bro=node->nextSibiling; bro; bro=bro->nextSibiling)
+
 
 /**
  * @brief Initializes a new tree, pre-allocation one pool of 

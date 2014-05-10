@@ -10,9 +10,11 @@
 
 /**
  * @brief Pure random playout policy.
- * Non-suicide legal moves are randomly selected until no moves are left on the board.
- * Scores are then calculated using tromp-taylor rules, and the winner is returned.
+ * Non-suicide legal moves are randomly selected until 
+ * no moves are left on the board.
+ * Scores are then calculated using tromp-taylor rules, 
+ * and the winner is returned.
  **/
-Color POLICY_pureRandom( UCTSearch* search );
+Color POLICY_pureRandom( UCTSearch* search, unsigned char* playedMoves );
 
 #endif

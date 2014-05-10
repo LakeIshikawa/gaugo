@@ -56,7 +56,7 @@ void GTPSynching_ucttree( GauGoEngine* engine, int argc, char** argv )
 	      child->played,
 	      child->AMAFwinsBlack,
 	      child->AMAFplayed,
-	      UCTNode_evaluateUCT( child, pos, !engine->board->turn, 0.44f )
+	      UCTNode_evaluateUCT( child, pos, engine->board->turn, 0.44f )
 	      );
     }
   }

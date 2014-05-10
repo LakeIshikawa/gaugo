@@ -20,9 +20,12 @@
  *
  * @param search The search
  * @param node The node from which to descend the tree
- * @return The color of the winner of the single random playout that was performed
+ * @param turn Current position board's turn
+ * @return The color of the winner of the single random 
+ * playout that was performed
  **/
-Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node );
+Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node, 
+				unsigned char* playedMoves, Color turn );
 
 /**
  * @brief Select the UCT-best children of speficied node 'pos', 
@@ -73,7 +76,10 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     search->board = &boardCopy;
 
     // Play one playout from the most UCT-RAVE promising node
-    UCTSearch_playSimulation(search, &search->tree->root);
+    unsigned char playedMoves[MAX_INTERSECTION_NUM];
+    memset(playedMoves, 0, sizeof(playedMoves));
+    UCTSearch_playSimulation(search, &search->tree->root, 
+			     playedMoves, search->board->turn);
 
     simulations++;
   } while(!(*(search->stopper))(search, simulations));
@@ -122,14 +128,15 @@ void UCTSearch_printPv( UCTSearch* search )
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
     if( pv[i] == PASS ) break;
     
-    char str[3];
+    char str[5];
     Board_intersectionName( search->board, pv[i], str );
     printf("%s ", str);
   }
   printf("\n");
 }
 
-Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos )
+Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos, 
+				unsigned char* playedMoves, Color turn )
 {
   Color winner;
 
@@ -138,7 +145,7 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos )
     UCTSearch_createChildren(search, pos);
 
     // Play random game
-    winner = (*(search->policy))(search);
+    winner = (*(search->policy))(search, playedMoves);
   }
   else{
 
@@ -154,22 +161,31 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos )
     }
 
     // Recurse
-    winner = UCTSearch_playSimulation( search, bestchild );
+    winner = UCTSearch_playSimulation( search, bestchild, 
+				       playedMoves, !turn );
   }
 
   // Playout finished, update statistics
   pos->played++;
-
   // Update winrate
-  if( winner == BLACK ) pos->winsBlack++;
-  
+  if( winner == BLACK ) {
+    pos->winsBlack++;
+  }
+
+  // Update AMAF (sibilings)
+  foreach_child(pos){
+    if( playedMoves[child->move] & (turn+1) ){
+      child->AMAFplayed++;
+      if( winner == BLACK ) child->AMAFwinsBlack++;
+    }
+  }
+
   return winner;
 }
 
 void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos )
 {      
   // Browses all legal children
-  //HashKey child;
   UCTNode* childNode = NULL;
   foreach_empty(search->board){
     if( Board_isLegalNoEyeFilling( search->board, empty ) ){
@@ -190,7 +206,6 @@ UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
   INTERSECTION bestMove = PASS;
 
   // Browses all children of current position
-  HashKey child;
   UCTNode* bestChild = NULL;
   foreach_child(pos){
     float uctValue = UCTNode_evaluateUCT( 
@@ -212,12 +227,25 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCT
   // Random huge value for unexplored nodes
   if( node->played == 0 ) return 10000.0f + (rand()%1000);
 
+  // AMAF weight
+  float beta = sqrt(500.0/(3*node->played+500));
+  float uct, amaf;
+
   switch( turn ){
   case BLACK:
-    return ((float)node->winsBlack / node->played) 
+    uct = (((float)node->winsBlack / node->played)) 
       + UCTK*sqrt( log(parent->played) / (5*node->played) );
+    amaf = ((float)node->AMAFwinsBlack / node->AMAFplayed)
+      + UCTK+sqrt( log(parent->AMAFplayed+1) / (5*node->AMAFplayed) );
+    break;
+    
   case WHITE:
-    return (1.0f - ((float)node->winsBlack / node->played)) 
+    uct = (1.0f - ((float)node->winsBlack / node->played)) 
       + UCTK*sqrt( log(parent->played) / (5*node->played) );
+    amaf = (1.0f - (float)node->AMAFwinsBlack / node->AMAFplayed)
+      + UCTK+sqrt( log(parent->AMAFplayed+1) / (5*node->AMAFplayed) );
+    break;
   }
+
+  return (1-beta)*uct + beta*amaf;
 }
