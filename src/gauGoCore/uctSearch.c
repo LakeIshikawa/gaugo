@@ -187,7 +187,10 @@ void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos )
 {      
   // Browses all legal children
   UCTNode* childNode = NULL;
-  foreach_empty(search->board){
+  int empty;
+  for(EMPTIES(search->board)){
+    empty = EMPTYI(search->board);
+
     if( Board_isLegalNoEyeFilling( search->board, empty ) ){
       UCTNode* newNode = UCTTree_newNode( search->tree );
       newNode->move = empty;
@@ -222,7 +225,8 @@ UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
   return bestChild;
 }
 
-float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCTK )
+float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, 
+			   Color turn, float UCTK )
 {
   // Random huge value for unexplored nodes
   if( node->played == 0 ) return 10000.0f + (rand()%1000);
@@ -245,6 +249,11 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, Color turn, float UCT
     amaf = (1.0f - (float)node->AMAFwinsBlack / node->AMAFplayed)
       + UCTK+sqrt( log(parent->AMAFplayed+1) / (5*node->AMAFplayed) );
     break;
+
+  default:
+    uct = -1;
+    amaf = -1;
+    gauAssert(0, NULL, NULL);
   }
 
   return (1-beta)*uct + beta*amaf;

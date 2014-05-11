@@ -224,7 +224,9 @@ int Board_isLegal(Board* board, INTERSECTION intersection)
   */
 
   // Check all directions!
-  foreach_neigh(board, intersection){
+  int neigh;
+  for( NEIGHBORS(intersection ) ){
+    neigh = NEIGHI(board, intersection);
     if( board->intersectionMap[neigh] == EMPTY ) return 1;
     
     StoneGroup* neighbourgh = STONE_GROUP(board->groupMap[neigh]);
@@ -242,7 +244,9 @@ int Board_isLegalNoEyeFilling(Board* board, INTERSECTION intersection)
 {
   if( !Board_isLegal( board, intersection ) ) return 0;
 
-  foreach_neigh( board, intersection ){
+  int neigh;
+  for( NEIGHBORS(intersection) ){
+    neigh = NEIGHI( board, intersection );
     Color nc = Board_getColor( board, neigh );
     if( nc == EMPTY || nc == !board->turn ) return 1;
 
@@ -255,7 +259,9 @@ int Board_isLegalNoEyeFilling(Board* board, INTERSECTION intersection)
 
 int Board_mustPass(Board* board, BoardIterator* iter)
 {
-  foreach_intersection(iter){
+  INTERSECTION intersection;
+  for( INTERSECTIONS(iter) ){
+    intersection = INTERSECTIONI(iter);
     if( Board_isLegal(board, intersection) ) return 0;
   }
 
@@ -305,8 +311,9 @@ void Board_playEmpty(Board* board, int emptyId)
      **/
     GRID ar[4] = {NULL_GROUP, NULL_GROUP, NULL_GROUP, NULL_GROUP};
     int ari=0;
-    foreach_neigh(board, intersection){
-      // Skip non-opponent groups
+    
+    for(NEIGHBORS(intersection)) {
+      int neigh = NEIGHI(board, intersection);
       if( board->intersectionMap[neigh] != !board->turn ) continue;
       
       int neighgroup = board->groupMap[neigh];
@@ -367,7 +374,10 @@ int Board_trompTaylorScore(Board* board, BoardIterator* it)
 {
   int points = board->blackCaptures - board->whiteCaptures;
   
-  foreach_intersection(it){
+  INTERSECTION intersection;
+  for( INTERSECTIONS(it) ){
+    intersection = INTERSECTIONI(it);
+    
     switch( board->intersectionMap[intersection] ){
     case BLACK: points++; break;
     case WHITE: points--; break;
@@ -397,7 +407,9 @@ void Board_mergeGroup(Board* board, GRID newGroup, INTERSECTION start)
 {  
   int anythingMerged = 0;
 
-  foreach_neigh( board, start ){
+  int neigh;
+  for( NEIGHBORS(start) ){
+    neigh = NEIGHI( board, start );
     int neighgroup = board->groupMap[neigh];
       
     // if neighbourgh intersection is a friend stone, merge all!
@@ -429,7 +441,9 @@ int Board_recalculateLiberties(Board* board,
   libmap[start] |= 2;
 
   int libs = 0;
-  foreach_neigh(board, start) {
+  int neigh;
+  for( NEIGHBORS(start) ){
+    neigh = NEIGHI(board, start);
     // Liberty
     if( board->intersectionMap[neigh] == EMPTY ){
       if( !(libmap[neigh]&1) ){
@@ -469,7 +483,9 @@ void Board_killStone(Board* board, INTERSECTION stone)
   int aa[4] = {NULL_GROUP, NULL_GROUP, NULL_GROUP, NULL_GROUP};
   int aai = 0;
   
-  foreach_neigh(board, stone) {
+  int neigh;
+  for( NEIGHBORS(stone) ){
+    neigh = NEIGHI(board, stone);
     // Liberty add
     if( board->intersectionMap[neigh] == board->turn ){
 
@@ -515,7 +531,9 @@ GRID Board_placeStone(Board* board, int emptyId)
   board->groupMap[intersection] = newGroup;
 
   // Determines and adds the liberties
-  foreach_neigh(board, intersection){
+  int neigh;
+  for( NEIGHBORS(intersection) ) {
+    neigh = NEIGHI(board, intersection);
     if( board->intersectionMap[neigh] == EMPTY ){
       board->groups[newGroup].libertiesNum++;
     }
@@ -637,7 +655,9 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
 
   // Empties
   fprintf(stream, "Empties: [");
-  foreach_empty(board){
+  int empty;
+  for( EMPTIES(board) ){
+    empty = EMPTYI(board);
     char name[4];
     Board_intersectionName( board, empty, name );
     fprintf(stream, "%s ", name);

@@ -140,7 +140,8 @@ typedef struct Board
  * intersection being browsed.
  *
  **/
-#define foreach_intersection(boardit) for(int i=0, intersection=boardit->intersections[0]; i<boardit->length; intersection=boardit->intersections[++i] )
+#define INTERSECTIONS(boardit) int i=0; i<boardit->length; i++
+#define INTERSECTIONI(boardit) boardit->intersections[i]
 
 /**
  * @brief Utility to loop over an intersection's neighbourgh.
@@ -153,9 +154,20 @@ typedef struct Board
  * neighbourgh being browsed.
  *
  **/
-#define foreach_neigh(board, intersection) for(int i=0, neigh=intersection+board->directionOffsets[0]; i<4; neigh=intersection+board->directionOffsets[++i] )
+#define NEIGHBORS(x) int i=0; i<4; i++
+#define NEIGHI(board, x) x+board->directionOffsets[i]
 
-#define foreach_empty(board) INTERSECTION empty=board->empties[0]; for(int i=0; i<board->emptiesNum; empty=board->empties[++i])
+/**
+ * Utilities to browse empty list prettily:
+ * 
+ * int empty;
+ * for( EMPTIES(board) ){
+ *   empty = EMPTY(board);
+ * ...
+ * }
+ **/
+#define EMPTIES(board) int i=0; i<board->emptiesNum; i++
+#define EMPTYI(board) board->empties[i]
 
 /**
  * @brief Initialize a new board of the specified size

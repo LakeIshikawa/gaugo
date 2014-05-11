@@ -24,7 +24,10 @@ void GTPSynching_board( GauGoEngine* engine, int argc, char** argv )
   Board_iterator(engine->board, &it);
   
   BoardIterator* itp = &it;
-  foreach_intersection(itp){
+  INTERSECTION intersection;
+  for( INTERSECTIONS(itp) ){
+    intersection = INTERSECTIONI(itp);
+
     switch( Board_getColor( engine->board, intersection ) ){
     case BLACK: printf("X"); break;
     case WHITE: printf("O"); break;
