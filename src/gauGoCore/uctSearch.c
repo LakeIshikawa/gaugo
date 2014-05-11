@@ -141,8 +141,10 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
   Color winner;
 
   // If this position is terminal, expand
-  if( !pos->firstChild ){
-    UCTSearch_createChildren(search, pos);
+  if( pos->played < 2 ){
+    if( !pos->firstChild ){
+      UCTSearch_createChildren(search, pos);
+    }
 
     // Play random game
     winner = (*(search->policy))(search, playedMoves);
@@ -233,28 +235,25 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent,
 
   // AMAF weight
   float beta = sqrt(500.0/(3*node->played+500));
-  float uct, amaf;
+  float value, amaf;
+  float uct = UCTK*sqrt( log(parent->played) / (5*node->played) );
 
   switch( turn ){
   case BLACK:
-    uct = (((float)node->winsBlack / node->played)) 
-      + UCTK*sqrt( log(parent->played) / (5*node->played) );
-    amaf = ((float)node->AMAFwinsBlack / node->AMAFplayed)
-      + UCTK+sqrt( log(parent->AMAFplayed+1) / (5*node->AMAFplayed) );
+    value = (((float)node->winsBlack / node->played));
+    amaf = ((float)node->AMAFwinsBlack / node->AMAFplayed);
     break;
     
   case WHITE:
-    uct = (1.0f - ((float)node->winsBlack / node->played)) 
-      + UCTK*sqrt( log(parent->played) / (5*node->played) );
-    amaf = (1.0f - (float)node->AMAFwinsBlack / node->AMAFplayed)
-      + UCTK+sqrt( log(parent->AMAFplayed+1) / (5*node->AMAFplayed) );
+    value = (1.0f - ((float)node->winsBlack / node->played));
+    amaf = (1.0f - (float)node->AMAFwinsBlack / node->AMAFplayed);
     break;
 
   default:
-    uct = -1;
     amaf = -1;
+    value = -1;
     gauAssert(0, NULL, NULL);
   }
 
-  return (1-beta)*uct + beta*amaf;
+  return (1-beta)*value + beta*amaf + uct;
 }
