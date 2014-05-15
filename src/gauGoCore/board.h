@@ -59,7 +59,7 @@ typedef struct BoardIterator
 typedef struct Board
 {
   /**
-   * Board's double-hash key
+   * Board's hash key
    **/
   HashKey hashKey;
 
@@ -69,18 +69,6 @@ typedef struct Board
    * represent all actual stone groups present on the board
    **/
   StoneGroup groups[MAX_STONEGROUPS];
-
-  /**
-   * The map of intersections
-   **/
-  Color intersectionMap[MAX_INTERSECTION_NUM];
-  
-  /**
-   * The map from coordinates to stoneGroups index.
-   * For every intersection, the pool index of the group to which it 
-   * belongs to (or GROUP_NULL for an empty) is mapped by this map.
-   **/
-  GRID groupMap[MAX_INTERSECTION_NUM];
 
   /**
    * List of empty squares
@@ -111,6 +99,24 @@ typedef struct Board
    * The position of the current Ko (or -1 if not present)
    **/
   INTERSECTION koPosition;
+
+  /**
+   * Points to the next stone in the group
+   * (to fastly loop all stones in a group)
+   **/
+  INTERSECTION nextStone[MAX_INTERSECTION_NUM];
+
+  /**
+   * The map of intersections
+   **/
+  Color intersectionMap[MAX_INTERSECTION_NUM];
+  
+  /**
+   * The map from coordinates to stoneGroups index.
+   * For every intersection, the pool index of the group to which it 
+   * belongs to (or GROUP_NULL for an empty) is mapped by this map.
+   **/
+  GRID groupMap[MAX_INTERSECTION_NUM];
 
   /**
    * The size of the board's side
@@ -271,6 +277,17 @@ void Board_play(Board* board, INTERSECTION intersection);
  * to play at
  **/
 void Board_playEmpty(Board* board, int emptyId);
+
+/**
+ * @brief Calculates the hash of the child board position
+ * after the specified move(empty) is played.
+ * The move must be legal.
+ *
+ * @param board The board
+ * @param emptyId The ordinal of the empty intersection
+ * in empties list
+ **/
+HashKey Board_childHash(Board* board, int emptyId);
 
 /**
  * @brief Plays a pass move on the specified board, which results

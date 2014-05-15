@@ -21,11 +21,13 @@
  * @param search The search
  * @param node The node from which to descend the tree
  * @param turn Current position board's turn
+ * @param depth Current tree depth
  * @return The color of the winner of the single random 
  * playout that was performed
  **/
 Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node, 
-				unsigned char* playedMoves, Color turn );
+				unsigned char* playedMoves, Color turn,
+				int depth);
 
 /**
  * @brief Select the UCT-best children of speficied node 'pos', 
@@ -33,6 +35,7 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node,
  *
  * @param search The search
  * @param pos The parent position
+ * @param depth Current tree depth
  * @return The currently UCT-best child node of specified position
  **/
 UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos );
@@ -42,9 +45,10 @@ UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos );
  * and stores them in the tree
  *
  * @param search The search
+ * @param depth Current tree depth
  * @param pos The position to expand
  **/
-void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos );
+void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos, int depth );
 
 void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree, 
 			   POLICY policy, STOPPER stopper, Options* options )
@@ -54,6 +58,10 @@ void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree,
   search->policy = policy;
   search->stopper = stopper;
   search->options = options;
+  search->lastBoards_next = 0;
+  memset(search->lastBoards, 0, sizeof(search->lastBoards));
+
+  Timer_initialize( &search->timer );
 }
 
 INTERSECTION UCTSearch_search( UCTSearch* search )
@@ -69,6 +77,9 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
   int simulations = 0;
   Board boardCopy;
 
+  // Starts timer
+  Timer_start( &search->timer );
+
   // Simulate until stopper signals to stop
   do{
     // Copy the board
@@ -79,7 +90,7 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     unsigned char playedMoves[MAX_INTERSECTION_NUM];
     memset(playedMoves, 0, sizeof(playedMoves));
     UCTSearch_playSimulation(search, &search->tree->root, 
-			     playedMoves, search->board->turn);
+			     playedMoves, search->board->turn, 0);
 
     simulations++;
   } while(!(*(search->stopper))(search, simulations));
@@ -115,16 +126,28 @@ void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node )
   }
 }
 
-void UCTSearch_printPv( UCTSearch* search )
+void UCTSearch_printSearchInfoHeader()
+{
+  printf("#  %-8s %-10s %-8s %-5s %-5s   %s\n", 
+	 "time", "playouts", "pps", "komi", "wr", "pv");
+}
+
+void UCTSearch_printSearchInfo( UCTSearch* search )
 {
   Board boardCopy = search->root;
   search->board = &boardCopy;
+
+  int elapsedMillis = Timer_getElapsedTime( &search->timer );
+  int pps = (search->tree->root.played*1000) / elapsedMillis; 
+  float wr = (float)search->tree->root.winsBlack / search->tree->root.played;
+  printf("#  %-8d %-10d %-8d %-5.1f %-5.2f   ",
+	 elapsedMillis, search->tree->root.played, pps, 
+	 search->options->komi, wr );
 
   // Gets pv
   INTERSECTION pv[MAX_INTERSECTION_NUM];
   UCTSearch_getPv( search, pv, &search->tree->root );
   
-  printf("#");
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
     if( pv[i] == PASS ) break;
     
@@ -136,14 +159,15 @@ void UCTSearch_printPv( UCTSearch* search )
 }
 
 Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos, 
-				unsigned char* playedMoves, Color turn )
+				unsigned char* playedMoves, Color turn,
+				int depth )
 {
   Color winner;
 
   // If this position is terminal, expand
-  if( pos->played < 2 ){
+  if( pos->played < 81 ){
     if( !pos->firstChild ){
-      UCTSearch_createChildren(search, pos);
+      UCTSearch_createChildren(search, pos, depth);
     }
 
     // Play random game
@@ -155,16 +179,25 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
     UCTNode* bestchild = UCTSearch_selectUCT(search, pos);
 
     // Go into child position
-    if( bestchild->move == PASS ){
+    if( bestchild == NULL ){
       Board_pass( search->board );
+      
+      // Create pass node
+      bestchild = UCTTree_newNode( search->tree );
+      bestchild->move = PASS;
+      pos->firstChild = bestchild;
     }
     else{
       Board_play( search->board, bestchild->move );
     }
 
+    // Save board hash to last boards (superko check)
+    search->lastBoards[search->lastBoards_next] = search->board->hashKey;
+    search->lastBoards_next = (search->lastBoards_next+1) % SUPERKO_HISTORY_MAX;
+
     // Recurse
     winner = UCTSearch_playSimulation( search, bestchild, 
-				       playedMoves, !turn );
+				       playedMoves, !turn, depth+1 );
   }
 
   // Playout finished, update statistics
@@ -185,7 +218,7 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
   return winner;
 }
 
-void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos )
+void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos, int depth )
 {      
   // Browses all legal children
   UCTNode* childNode = NULL;
@@ -194,6 +227,18 @@ void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos )
     empty = EMPTYI(search->board);
 
     if( Board_isLegalNoEyeFilling( search->board, empty ) ){
+
+      // Superko check
+      HashKey childHash = Board_childHash( search->board, i );
+      int superko = 0;
+      for(int k=0; k<SUPERKO_HISTORY_MAX; k++){
+	if( childHash == search->lastBoards[k] ) {
+	  superko = 1;
+	  break;
+	}
+      }
+      if( superko ) continue;
+
       UCTNode* newNode = UCTTree_newNode( search->tree );
       newNode->move = empty;
 

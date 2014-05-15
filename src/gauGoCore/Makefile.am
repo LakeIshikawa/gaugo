@@ -1,7 +1,7 @@
 # gauCore library
 lib_LIBRARIES = libgauGoCore.a
 libgauGoCore_a_SOURCES = board.c board_zobrist.c hashTable.c uctSearch.c \
-	policy_pureRandom.c stoppers.c crash.c memoryPool.c uctTree.c
+	policy_pureRandom.c stoppers.c crash.c memoryPool.c uctTree.c timer.c
 
 # gauCore library public headers
 include_HEADERS = board.h uctSearch.h hashTable.h crash.h

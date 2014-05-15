@@ -27,10 +27,26 @@ int zobristInitialized = 0;
  * Stone and liberties will all be transfered to newGroup, and all
  * neighbour groups will be deleted
  *
+ * @param board The board
  * @param newGroup The new group (1-stone brand new)
- * @aram start A stone of either groups to merge
+ * @param start A stone of either groups to merge
+ * @param libs Liberty map to avoid adding a liberty twice
  **/
-void Board_mergeGroup(Board* board, GRID newGroup, INTERSECTION start);
+void Board_mergeNeighbors(Board* board, GRID newGroup, INTERSECTION start,
+			  unsigned char* libs);
+
+/**
+ * @brief Merge group at 'neigh' to newGroup updating maps, 
+ * group stone and liberty counts, and removing the old group.
+ *
+ * @brief board The board
+ * @brief newGroup The new group to merge to
+ * @brief oldGroup The group to delete and merge
+ * @brief libs Liberties map to avoid adding a liberty twice
+ * @brief neigh Merge the group at this stone
+ **/
+void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup,
+		      unsigned char* libs, INTERSECTION neigh);
 
 /**
  * @brief Recalculate number of liberties of a string recursively.
@@ -51,18 +67,8 @@ int Board_recalculateLiberties(Board* board, GRID newGroup,
  *
  * @param board The board from which to kill the group
  * @param group The group to remove (pool index)
- * @param start A stone of the group to be killed
  **/
-void Board_killGroup(Board* board, GRID group, INTERSECTION start);
-
-/**
- * @brief Kills the specified stone and recursively kills all
- * neighbourghs, adding new liberties to surrounding groups as needed
- *
- * @param board The board
- * @param stone The stone to kill
- **/
-void Board_killStone(Board* board, INTERSECTION stone);
+void Board_killGroup(Board* board, GRID group);
 
 /**
  * @brief Place a stone on the board and create a new group of stones.
@@ -70,10 +76,13 @@ void Board_killStone(Board* board, INTERSECTION stone);
  * around it.
  *
  * @param board The board
- * @param emptyId The ordinal of the empty intersection to be added to the new group
- * @return The pool index of the new group initialized with the single stone and its liberties
+ * @param emptyId The ordinal of the empty intersection to be added to 
+ * the new group
+ * @param libs Liberty map to be filled
+ * @return The pool index of the new group initialized with the single 
+ * stone and its liberties
  **/
-GRID Board_placeStone(Board* board, int emptyId);
+GRID Board_placeStone(Board* board, int emptyId, unsigned char* libs);
 
 /**
  * @brief Sets the ko position to the specified intersection, 
@@ -134,8 +143,7 @@ void Board_initialize(Board* board, unsigned char size)
 
   // Clears hash (empty board is (1,1) 
   // to differentiate from unstored position(0,0))
-  board->hashKey.key1 = 1;
-  board->hashKey.key2 = 1;
+  board->hashKey = 1;
 
   // Initialize zobrist values if needed
   if( !zobristInitialized ){
@@ -166,6 +174,7 @@ void Board_initialize(Board* board, unsigned char size)
 
     // Group map
     board->groupMap[i] = NULL_GROUP;
+    board->nextStone[i] = 0;
   }
 }
 
@@ -293,15 +302,17 @@ void Board_playEmpty(Board* board, int emptyId)
   INTERSECTION koPosition = -1;
 
   // Create a group for the new stone (which will be eventually merged)
-  int unifiedGroup = Board_placeStone(board, emptyId);
+  unsigned char libs[MAX_INTERSECTION_NUM];
+  memset(libs, 0, sizeof(libs));
+  int unifiedGroup = Board_placeStone(board, emptyId, libs);
   
-  // If new stone has 4 liberty, stop here
+  // If new stone has 4 liberties, stop here
   if( board->groups[unifiedGroup].libertiesNum != 4 ){
 
     /**
      * Merge all surrounding groups with new group
      **/
-    Board_mergeGroup(board, unifiedGroup, intersection);
+    Board_mergeNeighbors(board, unifiedGroup, intersection, libs);
     
     /** 
      * Removes the liberty corresponding to the played intersection, for all the
@@ -336,7 +347,7 @@ void Board_playEmpty(Board* board, int emptyId)
 	capturedStones += board->groups[neighgroup].stonesNum;
 	if( capturedStones == 1 ) koPosition = neigh;
 	
-	Board_killGroup( board, neighgroup, neigh );
+	Board_killGroup( board, neighgroup );
       }
     }
 
@@ -359,20 +370,89 @@ void Board_playEmpty(Board* board, int emptyId)
 
   // Swap turn
   board->turn = !board->turn;
-  board->hashKey.key1 ^= zobrist1.turn;
-  board->hashKey.key2 ^= zobrist2.turn;  
+  board->hashKey ^= zobrist1.turn;
+}
+
+HashKey Board_childHash(Board* board, int emptyId)
+{
+  INTERSECTION intersection = board->empties[emptyId];
+  gauAssert(Board_isLegal(board, intersection), board, NULL);
+  
+  HashKey result = board->hashKey;
+
+  // If go is going on, clear it
+  if( board->koPosition != -1 ){
+    result ^= zobrist1.ko[board->koPosition];
+  }
+
+  // Hash-Play on the intersection
+  switch( board->turn ){
+  case BLACK:
+    result ^= zobrist1.black[intersection];
+    break;
+
+  case WHITE:
+    result ^= zobrist1.white[intersection];
+    break;
+  }
+
+  int koPosition = -1;
+  int friends = 0;
+  int capturedStones = 0;
+  for(NEIGHBORS(intersection)) {
+    int neigh = NEIGHI(board, intersection);
+    if( board->intersectionMap[neigh] != !board->turn ) {
+      if( board->intersectionMap[neigh] == board->turn ) friends++;
+      continue;
+    }
+    
+    int neighgroup = board->groupMap[neigh];
+    if( board->groups[neighgroup].libertiesNum == 0 ){
+      capturedStones += board->groups[neighgroup].stonesNum;
+      if( capturedStones == 1 ) koPosition = neigh;
+
+      // Hash kill stone
+      INTERSECTION stone;
+      for( STONES(board, neighgroup) ){
+	stone = STONEI();
+	
+	// Kill stone
+	switch( board->intersectionMap[stone] ){
+	case BLACK:
+	  result ^= zobrist1.black[intersection];
+	  break;
+	  
+	case WHITE:
+	  result ^= zobrist1.white[intersection];
+	  break;
+	}
+      }
+    }
+  }
+
+  // Hash set the ko if needed
+  if( capturedStones == 1 && friends == 0){
+    result ^= zobrist1.ko[koPosition];
+  }
+
+  // Hash swap turn
+  board->hashKey ^= zobrist1.turn;
+
+  return result;
 }
 
 void Board_pass(Board* board)
 {
   board->turn = !board->turn;
-  board->hashKey.key1 ^= zobrist1.turn;
-  board->hashKey.key2 ^= zobrist2.turn;
+  board->hashKey ^= zobrist1.turn;
+
+  // Not ko anymore
+  Board_unsetKoPosition(board);
 }
 
 int Board_trompTaylorScore(Board* board, BoardIterator* it)
 {
-  int points = board->blackCaptures - board->whiteCaptures;
+  int points = 0;
   
   INTERSECTION intersection;
   for( INTERSECTIONS(it) ){
@@ -403,114 +483,98 @@ void Board_iterator(Board* board, BoardIterator* iterator)
   }
 }
 
-void Board_mergeGroup(Board* board, GRID newGroup, INTERSECTION start)
+void Board_mergeNeighbors(Board* board, GRID newGroup, INTERSECTION start, 
+			  unsigned char* libs)
 {  
-  int anythingMerged = 0;
-
   int neigh;
   for( NEIGHBORS(start) ){
     neigh = NEIGHI( board, start );
-    int neighgroup = board->groupMap[neigh];
       
     // if neighbourgh intersection is a friend stone, merge all!
-    if( board->intersectionMap[neigh] == board->turn ){
-      board->groups[newGroup].stonesNum += board->groups[neighgroup].stonesNum;
-      board->groups[neighgroup].stonesNum = 0;
-      anythingMerged = 1;
+    if( board->intersectionMap[neigh] == board->turn &&
+	newGroup != board->groupMap[neigh] ){
+      Board_mergeGroup(board, newGroup, board->groupMap[neigh], libs, neigh);
+    }
+  }
+}
+
+void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup, 
+		      unsigned char* libs, INTERSECTION neigh)
+{
+  // Merge stone number and delete old group
+  board->groups[newGroup].stonesNum += board->groups[oldGroup].stonesNum;
+  board->groups[oldGroup].stonesNum = 0;
+
+  // Update all stone's map and count liberties
+  INTERSECTION mergeHead = board->groups[oldGroup].groupHead;
+  INTERSECTION stone = 0;
+  for( STONES( board, oldGroup) ){
+    stone = STONEI();
+      
+    // Update maps
+    board->groupMap[stone] = newGroup;
+
+    // Liberties
+    int stoneNeigh;
+    for( NEIGHBORS(stone) ){
+      stoneNeigh = NEIGHI(board, stone);      
+      if( board->intersectionMap[stoneNeigh] == EMPTY ){
+	if( !(libs[stoneNeigh]&1) ){
+	  // Flag the liberty so it won't be added twice
+	  libs[stoneNeigh] |= 1;
+	  board->groups[newGroup].libertiesNum++;
+	}
+      }
     }
   }
 
-  // If nothing was merged, terminate
-  if( !anythingMerged ) return;
-
-  // Recalculate stones and liberties
-  unsigned char libs[MAX_INTERSECTION_NUM];
-  memset(libs, 0, sizeof(libs));
-  
-  board->groups[newGroup].libertiesNum = 
-    Board_recalculateLiberties( board, newGroup, start, libs );
+  // Insert merged group's head right after new head
+  INTERSECTION head = board->groups[newGroup].groupHead;
+  INTERSECTION temp = board->nextStone[head];
+  board->nextStone[head] = mergeHead;
+  board->nextStone[stone] = temp;
 }
 
-int Board_recalculateLiberties(Board* board, 
-			       GRID newGroup,
-			       INTERSECTION start, 
-			       unsigned char* libmap) 
-{
-  // Dont recurse twice on the same stone
-  if( libmap[start] & 2 ) return 0;
-  libmap[start] |= 2;
-
-  int libs = 0;
-  int neigh;
-  for( NEIGHBORS(start) ){
-    neigh = NEIGHI(board, start);
-    // Liberty
-    if( board->intersectionMap[neigh] == EMPTY ){
-      if( !(libmap[neigh]&1) ){
-	// Flag the liberty so it won't be added twice
-	libmap[neigh] |= 1;
-	libs++;
-      }
-    }
-    
-    // Friend stone: recursion
-    else if( board->intersectionMap[neigh] == board->turn ){
-      libs += Board_recalculateLiberties(board, newGroup, neigh, libmap);
-      // Also set groupmap to new group
-      board->groupMap[neigh] = newGroup;
-    }
-  } 
-
-  return libs;
-}
-
-void Board_killGroup(Board* board, GRID group, INTERSECTION start)
+void Board_killGroup(Board* board, GRID group)
 {
   // Deletes the group
   board->groups[group].stonesNum = 0;
-
-  Board_killStone(board, start);
-}
-
-void Board_killStone(Board* board, INTERSECTION stone)
-{
-  // Do not kill twice
-  if( board->intersectionMap[stone] == EMPTY ) return;
-  // Kill stone
-  Board_unsetStone(board, stone);
   
-  // Give liberty to any surrounding group
-  int aa[4] = {NULL_GROUP, NULL_GROUP, NULL_GROUP, NULL_GROUP};
-  int aai = 0;
-  
-  int neigh;
-  for( NEIGHBORS(stone) ){
-    neigh = NEIGHI(board, stone);
-    // Liberty add
-    if( board->intersectionMap[neigh] == board->turn ){
+  INTERSECTION stone;
+  for( STONES(board, group) ){
+    stone = STONEI();
 
-      // Skip already added groups
-      int skip = 0;
-      for( int j=0; j<aai; j++ ){
-	if( board->groupMap[neigh] == aa[j] ) {
-	  skip = 1;
-	  break;
+    // Kill stone
+    Board_unsetStone(board, stone);
+    
+    // Give liberty to any surrounding group
+    int aa[4] = {NULL_GROUP, NULL_GROUP, NULL_GROUP, NULL_GROUP};
+    int aai = 0;
+  
+    int neigh;
+    for( NEIGHBORS(stone) ){
+      neigh = NEIGHI(board, stone);
+      // Liberty add
+      if( board->intersectionMap[neigh] == board->turn ){
+	
+	// Skip already added groups
+	int skip = 0;
+	for( int j=0; j<aai; j++ ){
+	  if( board->groupMap[neigh] == aa[j] ) {
+	    skip = 1;
+	    break;
+	  }
 	}
+	if( skip ) continue;
+
+	aa[aai++] = board->groupMap[neigh];
+	board->groups[board->groupMap[neigh]].libertiesNum++;
       }
-      if( skip ) continue;
-
-      aa[aai++] = board->groupMap[neigh];
-      board->groups[board->groupMap[neigh]].libertiesNum++;
     }
-
-    // Another dead - recursion
-    else if( board->intersectionMap[neigh] == !board->turn ) {
-      Board_killStone(board, neigh);
-    } 
   }
 }
 
-GRID Board_placeStone(Board* board, int emptyId)
+GRID Board_placeStone(Board* board, int emptyId, unsigned char* libs)
 {
   INTERSECTION intersection = board->empties[emptyId];
 
@@ -525,10 +589,12 @@ GRID Board_placeStone(Board* board, int emptyId)
   // Sets the new group informations
   board->groups[newGroup].libertiesNum = 0;
   board->groups[newGroup].stonesNum = 1;
+  board->groups[newGroup].groupHead = intersection;
 
   // Put the stone on the board
   Board_setStone(board, emptyId, board->turn);
   board->groupMap[intersection] = newGroup;
+  board->nextStone[intersection] = 0;
 
   // Determines and adds the liberties
   int neigh;
@@ -536,6 +602,7 @@ GRID Board_placeStone(Board* board, int emptyId)
     neigh = NEIGHI(board, intersection);
     if( board->intersectionMap[neigh] == EMPTY ){
       board->groups[newGroup].libertiesNum++;
+      libs[neigh] |= 1;
     }
   }
 
@@ -545,15 +612,13 @@ GRID Board_placeStone(Board* board, int emptyId)
 void Board_setKoPosition(Board* board, INTERSECTION intersection)
 {
   board->koPosition = intersection;
-  board->hashKey.key1 ^= zobrist1.ko[intersection];
-  board->hashKey.key2 ^= zobrist2.ko[intersection];
+  board->hashKey ^= zobrist1.ko[intersection];
 }
 
 void Board_unsetKoPosition(Board* board)
 {
   if( board->koPosition != -1 ){
-    board->hashKey.key1 ^= zobrist1.ko[board->koPosition];
-    board->hashKey.key2 ^= zobrist2.ko[board->koPosition];
+    board->hashKey ^= zobrist1.ko[board->koPosition];
     
     board->koPosition = -1;
   }
@@ -566,13 +631,11 @@ void Board_setStone(Board* board, int emptyId, Color color)
   
   switch( color ){
   case BLACK:
-    board->hashKey.key1 ^= zobrist1.black[intersection];
-    board->hashKey.key2 ^= zobrist2.black[intersection];
+    board->hashKey ^= zobrist1.black[intersection];
     break;
 
   case WHITE:
-    board->hashKey.key1 ^= zobrist1.white[intersection];
-    board->hashKey.key2 ^= zobrist2.white[intersection];
+    board->hashKey ^= zobrist1.white[intersection];
     break;
   }
 
@@ -584,13 +647,11 @@ void Board_unsetStone(Board* board, INTERSECTION intersection)
 {
   switch( board->intersectionMap[intersection] ){
   case BLACK:
-    board->hashKey.key1 ^= zobrist1.black[intersection];
-    board->hashKey.key2 ^= zobrist2.black[intersection];
+    board->hashKey ^= zobrist1.black[intersection];
     break;
 
   case WHITE:
-    board->hashKey.key1 ^= zobrist1.white[intersection];
-    board->hashKey.key2 ^= zobrist2.white[intersection];
+    board->hashKey ^= zobrist1.white[intersection];
     break;
   }
 
@@ -608,8 +669,8 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
 	  board->turn == BLACK ? "X" : "O", board->koPosition);
 
   // Prints hash
-  fprintf(stream, "hash: %016llx : %016llx\n", 
-	  board->hashKey.key1, board->hashKey.key2);
+  fprintf(stream, "hash: %016llx\n", 
+	  board->hashKey);
 
   // Prints row header
   fprintf(stream, "%-3s", "");
@@ -640,15 +701,22 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
 
   // Print group informations
   if( withGroupInfo ){
-    fprintf(stream, "%-3s %-5s %-5s\n", 
-	    "id", "libs", "nstn");
+    fprintf(stream, "%-3s %-5s %-5s %s\n", 
+	    "id", "libs", "nstn", "stones");
 
   
     for( int g=0; g<MAX_STONEGROUPS; g++ ){
       StoneGroup* group = &board->groups[g];
       if( group->stonesNum > 0 ){
-	fprintf(stream, "%-3d %-5d %-5d\n\n", 
+	fprintf(stream, "%-3d %-5d %-5d ", 
 		g, group->libertiesNum, group->stonesNum);
+    
+	for( STONES( board, g ) ){
+	  char name[5]; 
+	  Board_intersectionName(board, STONEI(), name);
+	  fprintf(stream, "%s ", name);
+	}
+	fprintf(stream, "\n");
       }
     }
   }

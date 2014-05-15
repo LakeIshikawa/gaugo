@@ -25,6 +25,9 @@ typedef struct Options
   /** komi */
   float komi;
 
+  /** verbosity: 0=GTP only 1=genmove log 2=log all */
+  int verbosity;
+
 } Options;
 
 

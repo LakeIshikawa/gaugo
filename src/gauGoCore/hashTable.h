@@ -15,22 +15,18 @@
 
 /**
  * @brief Hash key to the entries in the hash table.
- * Every table entry must map to 2 different 32-bit keys.
- * It is assumed that the combination of (key1, key2) is unique.
+ * Every table entry must map to 1 64-bit key.
+ * It is assumed that the key is unique.
  **/
-typedef struct HashKey
-{
-  unsigned long long key1;
-  unsigned long long key2;
-} HashKey;
-
+typedef unsigned long long HashKey;
 
 /**
  * @brief Data type of open-addressed double-hashing hash table.
  **/
 typedef struct HashTable
 {
-  /** Size in bits of the table's mask (table actual size is 2^sizeBits * bucketSize)*/
+  /** Size in bits of the table's mask 
+      (table actual size is 2^sizeBits * bucketSize)*/
   int maskSizeBits;
   /** Table 32-bit mask */
   int mask;
@@ -76,7 +72,7 @@ void HashTable_delete(HashTable* table);
  *
  * @return The pointer to newly stored data
  **/
-void* HashTable_insert(HashTable* table, HashKey* key, void* data);
+void* HashTable_insert(HashTable* table, HashKey key, void* data);
 
 /**
  * @brief Retrieves data stored in the hash table with specified key.
@@ -85,15 +81,6 @@ void* HashTable_insert(HashTable* table, HashKey* key, void* data);
  * @param key   The key which maps to stored data
  * @return The pointer to stored data if key is stored into the hash table, NULL otherwise
  **/
-void* HashTable_retrieve(HashTable* table, HashKey* key);
-
-/**
- * @brief Test 2 hash keys for equality
- *
- * @param key1 First key
- * @param key2 Second key
- * @param return Equality
- **/
-int HashKey_compare(HashKey* key1, HashKey* key2);
+void* HashTable_retrieve(HashTable* table, HashKey key);
 
 #endif

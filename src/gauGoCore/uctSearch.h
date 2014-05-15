@@ -15,6 +15,7 @@
 #include "hashTable.h"
 #include "options.h"
 #include "uctTree.h"
+#include "timer.h"
 
 #include <stdio.h>
 
@@ -43,6 +44,10 @@ typedef struct UCTSearch
   // Incremental/temporary handles (change along search)
   Board* board;
   BoardIterator* iter;
+  
+  // Last N board hashes for superko check in uct tree
+  HashKey lastBoards[SUPERKO_HISTORY_MAX];
+  int lastBoards_next;
 
   // Singleton-like data handles (constant along search)
   Board root;
@@ -50,6 +55,7 @@ typedef struct UCTSearch
   POLICY policy;
   STOPPER stopper;
   Options* options;
+  Timer timer;
 
   // UCT exploration/exploitation parameter
   float UCTK;
@@ -95,9 +101,14 @@ INTERSECTION UCTSearch_search( UCTSearch* search );
 void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node );
 
 /**
- * @brief Prints current pv to stdout in GTP comment format.
+ * @brief Prints the header for search info (ASCII table format)
+ **/
+void UCTSearch_printSearchInfoHeader();
+
+/**
+ * @brief Prints current search info to stdout (one line) in GTP comment format.
  *
  * @param search The search going on
  **/
-void UCTSearch_printPv( UCTSearch* search );
+void UCTSearch_printSearchInfo( UCTSearch* search );
 #endif

@@ -28,6 +28,12 @@ typedef struct StoneGroup
    **/
   short libertiesNum;
 
+  /**
+   * Points to the intersection which is the head of the group 
+   * i.e. the first stone placed on the board for this group
+   **/
+  INTERSECTION groupHead;
+
 } StoneGroup;
 
 
@@ -36,14 +42,7 @@ typedef struct StoneGroup
  * The current stone being browsed is set to variable 'stone'.
  *
  **/
-#define foreach_stone(group) for(short i=0, stone=group->intersections[0]; i<group->stonesNum; stone=group->intersections[++i])
-
-/**
- * @brief Utility to browse the liberties of a group.
- * The current intersection being browsed is set to variable 'liberty'.
- *
- **/
-#define foreach_liberty(group) for(short i=0, liberty=group->liberties[0]; i<group->libertiesNum; liberty=group->liberties[++i])
-
+#define STONES(board, group) INTERSECTION _st=board->groups[group].groupHead; _st; _st=board->nextStone[_st]
+#define STONEI() _st
 
 #endif

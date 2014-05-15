@@ -79,4 +79,10 @@ void GTPBasicCommands_komi( GauGoEngine* engine, int argc, char** argv );
  **/
 void GTPBasicCommands_clearboard( GauGoEngine* engine, int argc, char** argv );
 
+/**
+ * @brief Calculates the score (Tromp-Taylor) of a finished game.
+ * If the game is not finished, behaviour is undefined.
+ **/
+void GTPBasicCommands_finalscore( GauGoEngine* engine, int argc, char** argv );
+
 #endif

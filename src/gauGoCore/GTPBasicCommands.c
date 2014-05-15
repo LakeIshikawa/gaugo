@@ -29,7 +29,7 @@ void GTPBasicCommands_name( GauGoEngine* engine, int argc, char** argv )
 
 void GTPBasicCommands_protocolversion( GauGoEngine* engine, int argc, char** argv )
 {
-  GauGoEngine_saySuccess("1.0");
+  GauGoEngine_saySuccess("2");
 }
 
 void GTPBasicCommands_version( GauGoEngine* engine, int argc, char** argv )
@@ -112,11 +112,6 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
 			&STOPPER_5ksim, &engine->options );
   INTERSECTION move = UCTSearch_search( &search );
 
-  // Print pv (comment)
-#ifdef DEBUG
-  UCTSearch_printPv( &search );
-#endif
-
   char moveStr[5] = { '\0' };
   if( move == PASS ){
     GauGoEngine_play(engine, PASS);
@@ -191,6 +186,30 @@ void GTPBasicCommands_komi( GauGoEngine* engine, int argc, char** argv )
 
 void GTPBasicCommands_clearboard( GauGoEngine* engine, int argc, char** argv )
 {
+  // Delete tree
+  UCTTree_delete( &engine->lastTree );
+  UCTTree_initializeEmpty( &engine->lastTree );
+
+  // Reset board
   GauGoEngine_resetBoard( engine );
   GauGoEngine_saySuccess("");
+}
+
+void GTPBasicCommands_finalscore( GauGoEngine* engine, int argc, char** argv )
+{
+  BoardIterator it;
+  Board_iterator( engine->board, &it );
+  int score = Board_trompTaylorScore( engine->board, &it );
+
+  float finalScore = score - engine->options.komi;
+  char scoreBuf[8];
+  if( finalScore < 0 ){
+    sprintf(scoreBuf, "W+%2.1f", -finalScore);
+  } else if( finalScore > 0 ){
+    sprintf(scoreBuf, "B+%2.1f", finalScore);
+  } else {
+    sprintf(scoreBuf, "0");
+  }
+  
+  GauGoEngine_saySuccess(scoreBuf);
 }

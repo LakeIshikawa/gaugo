@@ -53,7 +53,7 @@ INTERSECTION pureRandom_playRandom(Board* board)
 Color POLICY_pureRandom( UCTSearch* search, unsigned char* playedMoves )
 {
   int passed = 0;
-  while( 1 ){
+  for( int m=0; m<PLAYOUT_MOVES_MAX; m++ ){
     INTERSECTION move = pureRandom_playRandom( search->board );
     if( move == PASS ){
       if( passed ){

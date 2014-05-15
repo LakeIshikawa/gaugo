@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <assert.h>
 #include "gauGoEngine.h"
 #include "GTPBasicCommands.h"
 #include "GTPArchiving.h"
@@ -42,6 +43,7 @@ CmdAndProcessor commandProcessors[] = {
   { "name", &GTPBasicCommands_name },
   { "protocol_version", &GTPBasicCommands_protocolversion },
   { "version", &GTPBasicCommands_version },
+  { "final_score", &GTPBasicCommands_finalscore },
 
   // Archiving
   { "load", &GTPArchiving_loadSGF },
@@ -59,7 +61,8 @@ int GauGoEngine_initialize( GauGoEngine* engine, int argc, char** argv )
 {
   // Parses command-line options
   Options_initialize( &engine->options, argc, argv );
-
+  // Set empty tree
+  UCTTree_initializeEmpty(&engine->lastTree);
   // Init board
   GauGoEngine_resetBoard( engine );
 
@@ -80,6 +83,7 @@ void GauGoEngine_resetBoard( GauGoEngine* engine )
   Board_initialize( engine->board, engine->options.boardSize );
 
   // Init tree to empty
+  UCTTree_delete(&engine->lastTree);
   UCTTree_initializeEmpty(&engine->lastTree);
 }
 
@@ -95,8 +99,7 @@ UCTNode* GauGoEngine_getTreePos( GauGoEngine* engine )
   for( i=0; i<engine->currentHistoryPos+1; i++ ){
     
     // Remember root when found
-    if( HashKey_compare(&engine->history[i].hashKey, 
-			&engine->lastTree.rootHash )) {
+    if( engine->history[i].hashKey == engine->lastTree.rootHash ) {
       rootFound = 1;
     }
 
@@ -119,6 +122,8 @@ UCTNode* GauGoEngine_getTreePos( GauGoEngine* engine )
 
 void GauGoEngine_play(GauGoEngine* engine, INTERSECTION move)
 {
+  assert( engine->historyLength <= HISTORY_LENGTH_MAX );
+
   // If the redo is possible
   int redone = 0;
   if( engine->currentHistoryPos < engine->historyLength-1 ) {

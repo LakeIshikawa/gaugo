@@ -31,34 +31,34 @@ void HashTable_delete(HashTable* table)
   table->memory = NULL;
 }
 
-void* HashTable_insert(HashTable* table, HashKey* key, void* data)
+void* HashTable_insert(HashTable* table, HashKey key, void* data)
 {
   // First probe
   HashKey* probe = 
     (HashKey*)((char*)table->memory 
-	       + (key->key1 & table->mask) 
+	       + (key & table->mask) 
 	       * (sizeof(HashKey) + table->bucketSizeBytes));
 
   // Empty slot found
-  if( probe->key1 == 0 && probe->key2 == 0 ){
-    *(probe) = *key;
+  if( probe == 0 ){
+    *(probe) = key;
     memcpy(((char*)probe) + sizeof(HashKey), data, table->bucketSizeBytes);
   }
   else{
     // First key collision
     table->firstKeyCollisions++;
 
-    // Search at intervals of key2
+    // Search at intervals of 1 
     int i=1;
     do {
       probe = (HashKey*)((char*)table->memory 
-			 + ((key->key1 + i*key->key2) & table->mask) 
+			 + ((key + i) & table->mask) 
 			 * (sizeof(HashKey) + table->bucketSizeBytes));
       i++;
     } 
-    while( probe->key1 != 0 || probe->key2 != 0 );
+    while( *probe != 0 );
 
-    *(probe) = *key;
+    *(probe) = key;
     memcpy(((char*)probe) + sizeof(HashKey), data, table->bucketSizeBytes);
   }
   
@@ -74,24 +74,19 @@ void* HashTable_insert(HashTable* table, HashKey* key, void* data)
  * @param key   The key which maps to stored data
  * @return The pointer to stored data if key is stored into the hash table, NULL otherwise
  **/
-void* HashTable_retrieve(HashTable* table, HashKey* key)
+void* HashTable_retrieve(HashTable* table, HashKey key)
 {
-  // Search at intervals of key2 until match or empty slot
+  // Search at intervals of 1 until match or empty slot
   int i=0;
   HashKey* probe;
 
   while( 1 ){
     probe = (HashKey*)((char*)table->memory 
-		       + ((key->key1 + i*key->key2) & table->mask) 
+		       + ((key + i) & table->mask) 
 		       * (sizeof(HashKey) + table->bucketSizeBytes));
-    if( probe->key1==0 && probe->key2==0 ) return NULL;
-    if( probe->key1==key->key1 && probe->key2==key->key2 ) return ((char*)probe) + sizeof(HashKey);
+    if( *probe==0 ) return NULL;
+    if( *probe==key ) return ((char*)probe) + sizeof(HashKey);
 
     i++;
   }
-}
-
-int HashKey_compare(HashKey* key1, HashKey* key2)
-{
-  return key1->key1 == key2->key1 && key1->key2 == key2->key2;
 }

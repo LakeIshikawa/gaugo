@@ -18,6 +18,17 @@
  **/
 #define MAX_BOARD_SIZE 19
 
+/**
+ * @brief Maximum game length that
+ * the engine can support
+ **/
+#define HISTORY_LENGTH_MAX 512
+
+/**
+ * @brief Max number of previous board states
+ * to be checked for super-ko inside tree search
+ **/
+#define SUPERKO_HISTORY_MAX 8
 
 /**
  * @brief The maximum number of needed intersection data
@@ -26,6 +37,12 @@
  * intersections, as long as the last column.
  **/
 #define MAX_INTERSECTION_NUM ((MAX_BOARD_SIZE+1) * (MAX_BOARD_SIZE+2))
+
+/**
+ * @brief Maximum number of moves in one playout 
+ * (to avoid superko infinite games)
+ **/
+#define PLAYOUT_MOVES_MAX 512
 
 /**
  * @brief Type used to index stone groups in the stone group pool

@@ -29,7 +29,9 @@ void* MemoryPool_allocate( MemoryPool* pool )
   
   // Allocate one element
   void* el = pool->nextAvailable;
-  pool->nextAvailable = ((unsigned char*)pool->nextAvailable) + pool->elementSize;
+  pool->nextAvailable = 
+    ((unsigned char*)pool->nextAvailable) 
+    + pool->elementSize;
 
   return el;
 }

@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     // Gets move from stdin
     printf("\nmove:");
     char move[8];
-    fgets(move, 8, stdin);
+    if( fgets(move, 8, stdin) == NULL ) return 0;
 
     if( strcmp(move, "pass") == 0 ){
       Board_pass(&board);

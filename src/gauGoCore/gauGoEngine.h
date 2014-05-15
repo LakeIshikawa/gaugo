@@ -13,8 +13,7 @@
 #include "board.h"
 #include "uctTree.h"
 #include "options.h"
-
-#define HISTORY_LENGTH_MAX 512
+#include "global_defs.h"
 
 /**
  * @brief GTP errors
