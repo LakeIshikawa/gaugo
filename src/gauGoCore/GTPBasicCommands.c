@@ -46,13 +46,12 @@ void GTPBasicCommands_play( GauGoEngine* engine, int argc, char** argv )
     return;
   }
 
-  // Checek color
+  // Pass once if wrong color
   if( ! ( ((strcmp( argv[1], "w" ) == 0 || (strcmp( argv[1], "W" ) == 0)) 
 	   && engine->board->turn == WHITE)
 	  || ((strcmp( argv[1], "b" ) == 0 || (strcmp( argv[1], "B" ) == 0)) 
 	      && engine->board->turn == BLACK) ) ) {
-    GauGoEngine_sayError( WRONG_COLOR );
-    return;
+    GauGoEngine_play(engine, PASS);
   }
 
   // Check for the pass move

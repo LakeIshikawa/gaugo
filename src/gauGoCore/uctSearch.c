@@ -11,6 +11,9 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Move representation for solved position 
+#define SOLVED 401
+
 // Private methods 
 
 /**
@@ -22,12 +25,13 @@
  * @param node The node from which to descend the tree
  * @param turn Current position board's turn
  * @param depth Current tree depth
+ * @param pass Comes from a pass move
  * @return The color of the winner of the single random 
  * playout that was performed
  **/
 Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* node, 
 				unsigned char* playedMoves, Color turn,
-				int depth);
+				int depth, int pass);
 
 /**
  * @brief Select the UCT-best children of speficied node 'pos', 
@@ -94,7 +98,8 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     unsigned char playedMoves[MAX_INTERSECTION_NUM];
     memset(playedMoves, 0, sizeof(playedMoves));
     UCTSearch_playSimulation(search, &search->tree->root, 
-			     playedMoves, search->board->turn, 0);
+			     playedMoves, search->board->turn, 
+			     0, 0);
 
     simulations++;
   } while(!(*(search->stopper))(search, simulations));
@@ -109,7 +114,7 @@ void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node )
 {
   // Select most visited move from root
   int mostPlayed = -1;
-  INTERSECTION bestMove = PASS;
+  INTERSECTION bestMove = 0;
   UCTNode* bestChild = NULL;
 
   // Browses all children
@@ -153,8 +158,8 @@ void UCTSearch_printSearchInfo( UCTSearch* search )
   UCTSearch_getPv( search, pv, &search->tree->root );
   
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
-    if( pv[i] == PASS ) break;
-    
+    if( !pv[i] ) break;
+
     char str[5];
     Board_intersectionName( search->board, pv[i], str );
     printf("%s ", str);
@@ -164,10 +169,10 @@ void UCTSearch_printSearchInfo( UCTSearch* search )
 
 Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos, 
 				unsigned char* playedMoves, Color turn,
-				int depth )
+				int depth, int pass )
 {
   Color winner;
-
+  
   // If this position is terminal, expand
   if( pos->played < search->options->expansionVisits ){
     if( !pos->firstChild ){
@@ -183,15 +188,21 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
     UCTNode* bestchild = UCTSearch_selectUCT(search, pos);
 
     // Go into child position
-    if( bestchild == NULL ){
+    if( bestchild->move == PASS ){
+      if( pass ){
+	// Node is solved!
+	int score = (float)Board_trompTaylorScore( search->board, search->iter );
+	winner = (score > search->options->komi) ? BLACK : WHITE;
+	pos->played++;
+	if( winner == BLACK ) pos->winsBlack++;
+	return winner;
+      }
+
+      pass = 1;
       Board_pass( search->board );
-      
-      // Create pass node
-      bestchild = UCTTree_newNode( search->tree );
-      bestchild->move = PASS;
-      pos->firstChild = bestchild;
     }
     else{
+      pass = 0;
       Board_play( search->board, bestchild->move );
     }
 
@@ -201,7 +212,7 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
 
     // Recurse
     winner = UCTSearch_playSimulation( search, bestchild, 
-				       playedMoves, !turn, depth+1 );
+				       playedMoves, !turn, depth+1, pass );
   }
 
   // Playout finished, update statistics
@@ -227,6 +238,7 @@ void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos, int depth )
   // Browses all legal children
   UCTNode* childNode = NULL;
   int empty;
+  int numChildren = 0;
   for(EMPTIES(search->board)){
     empty = EMPTYI(search->board);
 
@@ -250,13 +262,23 @@ void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos, int depth )
       if( childNode == NULL ) pos->firstChild = newNode;
       else childNode->nextSibiling = newNode;
       childNode = newNode;
+      numChildren++;
     }
+  }
+
+        
+  // Create pass node
+  if( numChildren <= UCT_PASSNODE_MAX_CHILDREN ){
+    UCTNode* newNode = UCTTree_newNode( search->tree );
+    newNode->move = PASS;
+    if( childNode == NULL ) pos->firstChild = newNode;
+    else childNode->nextSibiling = newNode;
   }
 }
 
 UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
 {
-  float bestUCT = 0.0f;
+  float bestUCT = -100.0f;
   INTERSECTION bestMove = PASS;
 
   // Browses all children of current position
@@ -280,22 +302,23 @@ float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent,
 			   Color turn, float UCTK )
 {
   // Random huge value for unexplored nodes
-  if( node->played == 0 ) return 10000.0f + (rand()%1000);
+  float amaf = ((float)node->AMAFwinsBlack / (node->AMAFplayed+1) );
+  if( node->played == 0 ) 
+    return 10000.0f + ((turn==BLACK) ? amaf : 1.0f-amaf);
 
   // AMAF weight
   float beta = sqrt(500.0/(3*node->played+500));
-  float value, amaf;
+  float value;
   float uct = UCTK*sqrt( log(parent->played) / (5*node->played) );
 
   switch( turn ){
   case BLACK:
     value = (((float)node->winsBlack / node->played));
-    amaf = ((float)node->AMAFwinsBlack / node->AMAFplayed);
     break;
     
   case WHITE:
     value = (1.0f - ((float)node->winsBlack / node->played));
-    amaf = (1.0f - (float)node->AMAFwinsBlack / node->AMAFplayed);
+    amaf = 1.0f - amaf;
     break;
 
   default:

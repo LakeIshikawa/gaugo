@@ -702,7 +702,7 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
   int empty;
   for( EMPTIES(board) ){
     empty = EMPTYI(board);
-    char name[4];
+    char name[5];
     Board_intersectionName( board, empty, name );
     fprintf(stream, "%s ", name);
   }
@@ -712,6 +712,11 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
 void Board_intersectionName(Board* board, INTERSECTION intersection, 
 			    char* nameBuffer)
 {
+  if( intersection == PASS ){
+    sprintf(nameBuffer, "pass");
+    return;
+  }
+
   int x = Board_intersectionX(board, intersection);
   int y = Board_intersectionY(board, intersection);
   

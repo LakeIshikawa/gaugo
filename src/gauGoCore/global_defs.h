@@ -67,4 +67,18 @@ typedef short INTERSECTION;
  **/
 #define MAX_STONEGROUPS 255
 
+/**
+ * @brief The maximum number of children a node can have for
+ * the pass move to be created.  No pass move will be added to 
+ * one node's children if the children number of that node
+ * excluding the pass move if above this value
+ *
+ **/
+#define UCT_PASSNODE_MAX_CHILDREN 10
+
+/**
+ * @brief Some value close to infinity
+ **/
+#define INFINITY 0xFFFFFFF
+
 #endif

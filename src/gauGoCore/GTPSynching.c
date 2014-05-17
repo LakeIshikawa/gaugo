@@ -51,7 +51,7 @@ void GTPSynching_ucttree( GauGoEngine* engine, int argc, char** argv )
   UCTNode* pos = GauGoEngine_getTreePos( engine );
   if( pos ){
     foreach_child( pos ){
-      char intName[4];
+      char intName[5];
       Board_intersectionName( engine->board, child->move, intName );
       printf( "%s/%d/%d/%d/%d/%f,", 
 	      intName, 
