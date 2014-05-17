@@ -42,20 +42,24 @@ void GTPArchiving_loadSGF( GauGoEngine* engine, int argc, char** argv )
     }
     
     else{
-      assert( is_move_node( tree.lastnode ) );
-      INTERSECTION move = 
-	Board_intersection( 
-			   engine->board, 
-			   get_moveY(tree.lastnode->props, size),
-			   get_moveX(tree.lastnode->props, size)
-			    );
-      // SGF validation check
-      if( !Board_isLegal(engine->board, move) ){
-	GauGoEngine_sayError(BAD_DATA);
+      if( is_move_node( tree.lastnode ) ){
+	INTERSECTION move = 
+	  Board_intersection( 
+			     engine->board, 
+			     get_moveY(tree.lastnode->props, size),
+			     get_moveX(tree.lastnode->props, size)
+			      );
+	// SGF validation check
+	if( !Board_isLegal(engine->board, move) ){
+	  GauGoEngine_sayError(BAD_DATA);
+	}
+	
+	// Must be able to play
+	GauGoEngine_play( engine, move );
       }
-      
-      // Must be able to play
-      GauGoEngine_play( engine, move );
+      else if( is_pass_node( tree.lastnode, size ) ){
+	GauGoEngine_play( engine, PASS );
+      }
     }
   }
 

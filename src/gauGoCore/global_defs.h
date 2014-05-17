@@ -67,5 +67,4 @@ typedef short INTERSECTION;
  **/
 #define MAX_STONEGROUPS 255
 
-
 #endif

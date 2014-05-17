@@ -43,14 +43,14 @@ typedef struct UCTSearch
 {
   // Incremental/temporary handles (change along search)
   Board* board;
-  BoardIterator* iter;
-  
+  BoardIterator* iter;  
   // Last N board hashes for superko check in uct tree
   HashKey lastBoards[SUPERKO_HISTORY_MAX];
   int lastBoards_next;
 
   // Singleton-like data handles (constant along search)
   Board root;
+  HashKey rootLastBoards[SUPERKO_HISTORY_MAX];
   UCTTree* tree;
   POLICY policy;
   STOPPER stopper;
@@ -71,9 +71,11 @@ typedef struct UCTSearch
  * @param policy A playout policy
  * @param stopper Function to stop the search arbitrarily
  * @param options Search options
+ * @param lastBoards Last boards' hash keys to avoid superko
  **/
 void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree, 
-			   POLICY policy, STOPPER stopper, Options* options );
+			   POLICY policy, STOPPER stopper, Options* options,
+			   HashKey lastBoards[SUPERKO_HISTORY_MAX]);
 
 /**
  * @brief Performs an UCT search from the specified board position, and using the
@@ -84,8 +86,8 @@ void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree,
  * or continue.
  *
  * When the search terminates, the intersection representing the best 
- * children of root position according
- * only to winrate is returned.  For further informations, consult the hash table.
+ * children of root position according only to the number of 
+ * simulations played is returned.
  *
  **/
 INTERSECTION UCTSearch_search( UCTSearch* search );

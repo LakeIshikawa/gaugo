@@ -28,6 +28,9 @@ typedef struct Options
   /** verbosity: 0=GTP only 1=genmove log 2=log all */
   int verbosity;
 
+  /** Minimum number of visits for a UCT node before being expanded */
+  int expansionVisits;
+
 } Options;
 
 

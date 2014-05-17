@@ -51,7 +51,8 @@ UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos );
 void UCTSearch_createChildren( UCTSearch* search, UCTNode* pos, int depth );
 
 void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree, 
-			   POLICY policy, STOPPER stopper, Options* options )
+			   POLICY policy, STOPPER stopper, Options* options,
+			   HashKey lastBoards[SUPERKO_HISTORY_MAX])
 {
   search->root = *board;
   search->tree = tree;
@@ -59,7 +60,7 @@ void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree,
   search->stopper = stopper;
   search->options = options;
   search->lastBoards_next = 0;
-  memset(search->lastBoards, 0, sizeof(search->lastBoards));
+  memcpy(search->rootLastBoards, lastBoards, sizeof(search->lastBoards));
 
   Timer_initialize( &search->timer );
 }
@@ -85,6 +86,9 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     // Copy the board
     Board_copy( &boardCopy, &search->root );
     search->board = &boardCopy;
+    // Copy last boards
+    memcpy(search->lastBoards, search->rootLastBoards, sizeof(search->lastBoards));
+    search->lastBoards_next = 0;
 
     // Play one playout from the most UCT-RAVE promising node
     unsigned char playedMoves[MAX_INTERSECTION_NUM];
@@ -165,7 +169,7 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
   Color winner;
 
   // If this position is terminal, expand
-  if( pos->played < 81 ){
+  if( pos->played < search->options->expansionVisits ){
     if( !pos->firstChild ){
       UCTSearch_createChildren(search, pos, depth);
     }

@@ -105,11 +105,18 @@ void GTPBasicCommands_genmove( GauGoEngine* engine, int argc, char** argv )
 		     engine->options.treePoolNodeNum,
 		     engine->board);
 
+  // Last boards' hash keys
+  HashKey lastBoards[SUPERKO_HISTORY_MAX];
+  int b=0;
+  for( int i=engine->currentHistoryPos; i>=0 && b<SUPERKO_HISTORY_MAX; i-- ){
+    lastBoards[SUPERKO_HISTORY_MAX-(++b)] = engine->history[i].hashKey;
+  }
+
   // UCT search
   UCTSearch search;
   UCTSearch_initialize( &search, engine->board, 
 			&engine->lastTree, &POLICY_pureRandom, 
-			&STOPPER_5ksim, &engine->options );
+			&STOPPER_5ksim, &engine->options, lastBoards );
   INTERSECTION move = UCTSearch_search( &search );
 
   char moveStr[5] = { '\0' };

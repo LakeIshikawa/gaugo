@@ -370,7 +370,6 @@ void Board_playEmpty(Board* board, int emptyId)
 
   // Swap turn
   board->turn = !board->turn;
-  board->hashKey ^= zobrist1.turn;
 }
 
 HashKey Board_childHash(Board* board, int emptyId)
@@ -379,11 +378,6 @@ HashKey Board_childHash(Board* board, int emptyId)
   gauAssert(Board_isLegal(board, intersection), board, NULL);
   
   HashKey result = board->hashKey;
-
-  // If go is going on, clear it
-  if( board->koPosition != -1 ){
-    result ^= zobrist1.ko[board->koPosition];
-  }
 
   // Hash-Play on the intersection
   switch( board->turn ){
@@ -396,20 +390,14 @@ HashKey Board_childHash(Board* board, int emptyId)
     break;
   }
 
-  int koPosition = -1;
-  int friends = 0;
-  int capturedStones = 0;
   for(NEIGHBORS(intersection)) {
     int neigh = NEIGHI(board, intersection);
     if( board->intersectionMap[neigh] != !board->turn ) {
-      if( board->intersectionMap[neigh] == board->turn ) friends++;
       continue;
     }
     
     int neighgroup = board->groupMap[neigh];
-    if( board->groups[neighgroup].libertiesNum == 0 ){
-      capturedStones += board->groups[neighgroup].stonesNum;
-      if( capturedStones == 1 ) koPosition = neigh;
+    if( board->groups[neighgroup].libertiesNum == 1 ){
 
       // Hash kill stone
       INTERSECTION stone;
@@ -419,24 +407,16 @@ HashKey Board_childHash(Board* board, int emptyId)
 	// Kill stone
 	switch( board->intersectionMap[stone] ){
 	case BLACK:
-	  result ^= zobrist1.black[intersection];
+	  result ^= zobrist1.black[stone];
 	  break;
 	  
 	case WHITE:
-	  result ^= zobrist1.white[intersection];
+	  result ^= zobrist1.white[stone];
 	  break;
 	}
       }
     }
   }
-
-  // Hash set the ko if needed
-  if( capturedStones == 1 && friends == 0){
-    result ^= zobrist1.ko[koPosition];
-  }
-
-  // Hash swap turn
-  board->hashKey ^= zobrist1.turn;
 
   return result;
 }
@@ -444,7 +424,6 @@ HashKey Board_childHash(Board* board, int emptyId)
 void Board_pass(Board* board)
 {
   board->turn = !board->turn;
-  board->hashKey ^= zobrist1.turn;
 
   // Not ko anymore
   Board_unsetKoPosition(board);
@@ -612,14 +591,11 @@ GRID Board_placeStone(Board* board, int emptyId, unsigned char* libs)
 void Board_setKoPosition(Board* board, INTERSECTION intersection)
 {
   board->koPosition = intersection;
-  board->hashKey ^= zobrist1.ko[intersection];
 }
 
 void Board_unsetKoPosition(Board* board)
 {
   if( board->koPosition != -1 ){
-    board->hashKey ^= zobrist1.ko[board->koPosition];
-    
     board->koPosition = -1;
   }
 }

@@ -16,6 +16,7 @@ void Options_initialize( Options* options, int argc, char** argv )
   options->treePoolNodeNum = 1000000;
   options->komi = 7.5f;
   options->verbosity = 1;
+  options->expansionVisits = 7;
 
   // Parse command line options
   static struct option long_options[] = {
@@ -24,13 +25,14 @@ void Options_initialize( Options* options, int argc, char** argv )
     {"tpnodes", no_argument, 0, 'p'},
     {"komi", no_argument, 0,  'k'},
     {"verbosity", no_argument, 0, 'v'},
+    {"expansion_visits", no_argument, 0, 'x'},
     //{"datapath", required_argument, 0,  'd' },
     {0,         0,                 0,  0 }
   };
   int c, option_index;
   
   while(1){
-    c = getopt_long(argc, argv, "s:h:k:p:v:", long_options, &option_index);
+    c = getopt_long(argc, argv, "s:h:k:p:v:x:", long_options, &option_index);
     if( c==-1 ) break;
     switch(c){
       // Board size
@@ -43,6 +45,8 @@ void Options_initialize( Options* options, int argc, char** argv )
     case 'k' : options->boardSize = atof(optarg); break;
       // Verbosity
     case 'v' : options->verbosity = atoi(optarg); break;
+      // Expansion visits threashold
+    case 'x' : options->expansionVisits = atoi(optarg); break;
     }
   }
 }
