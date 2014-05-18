@@ -10,7 +10,7 @@
 #include "gauGoEngine.h"
 #include "GTPBasicCommands.h"
 #include "GTPArchiving.h"
-#include "GTPSynching.h"
+#include "GTPGogui.h"
 
 /**
  * @brief GTP command processor function type
@@ -49,9 +49,9 @@ CmdAndProcessor commandProcessors[] = {
   { "load", &GTPArchiving_loadSGF },
   { "save", &GTPArchiving_saveSGF },
 
-  // Synching
-  { "board", &GTPSynching_board },
-  { "ucttree", &GTPSynching_ucttree },
+  // Gogui
+  { "gogui-analyze_commands", &GTPGogui_analyzecommands },
+  { "gogui-nodeinfo", &GTPGogui_nodeinfo },
 
   { NULL, NULL }
 };

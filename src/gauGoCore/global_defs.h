@@ -76,9 +76,4 @@ typedef short INTERSECTION;
  **/
 #define UCT_PASSNODE_MAX_CHILDREN 10
 
-/**
- * @brief Some value close to infinity
- **/
-#define INFINITY 0xFFFFFFF
-
 #endif

@@ -298,7 +298,7 @@ UCTNode* UCTSearch_selectUCT( UCTSearch* search, UCTNode* pos )
   return bestChild;
 }
 
-float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, 
+float UCTNode_evaluateUCT( const UCTNode* node, const UCTNode* parent, 
 			   Color turn, float UCTK )
 {
   // Random huge value for unexplored nodes

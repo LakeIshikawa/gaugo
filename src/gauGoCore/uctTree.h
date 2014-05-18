@@ -132,7 +132,7 @@ void UCTNode_initialize( UCTNode* node );
  * @param turn Turn color at node
  * @param UCTK UCT constant
  **/
-float UCTNode_evaluateUCT( UCTNode* node, UCTNode* parent, 
+float UCTNode_evaluateUCT( const UCTNode* node, const UCTNode* parent, 
 			   Color turn, float UCTK);
 
 #endif
