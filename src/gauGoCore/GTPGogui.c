@@ -8,10 +8,12 @@
 #include <stdlib.h>
 #include "GTPGogui.h"
 #include "board.h"
+#include "uctTree.h"
 
 // gogui_analyze commands declaration
 const char* goguiAnalyzeCommands[] = {
   "gfx/NodeInfo/gogui-nodeinfo",
+  "gfx/PV/gogui-pv",
   NULL
 };
 
@@ -65,6 +67,33 @@ void GTPGogui_nodeinfo( GauGoEngine* engine, int argc, char** argv )
       if( i<5 ){
 	printf( "LABEL %s %d\n", intName, i+1 );
       }
+    }
+  }
+
+  printf("\n\n");
+  fflush(stdout);
+}
+
+void GTPGogui_pv( GauGoEngine* engine, int argc, char** argv )
+{
+  printf("= ");
+  
+  // Gets pv
+  INTERSECTION pv[MAX_INTERSECTION_NUM];
+  UCTNode* pos = GauGoEngine_getTreePos( engine );
+  if( pos ){
+    printf("VAR ");
+    UCTTree_getPv( pv, pos );
+    
+    Color turn = engine->board->turn;
+    for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
+      if( !pv[i] ) break;
+      
+      char str[5];
+      Board_intersectionName( engine->board, pv[i], str );
+      printf("%c %s ", turn==BLACK?'b':'w', str);
+      
+      turn = !turn;
     }
   }
 

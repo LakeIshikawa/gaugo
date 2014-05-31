@@ -17,6 +17,7 @@ void Options_initialize( Options* options, int argc, char** argv )
   options->komi = 7.5f;
   options->verbosity = 1;
   options->expansionVisits = 7;
+  options->gogui = 0;
 
   // Parse command line options
   static struct option long_options[] = {
@@ -26,13 +27,14 @@ void Options_initialize( Options* options, int argc, char** argv )
     {"komi", no_argument, 0,  'k'},
     {"verbosity", no_argument, 0, 'v'},
     {"expansion_visits", no_argument, 0, 'x'},
+    {"gogui", no_argument, 0, 'g'},
     //{"datapath", required_argument, 0,  'd' },
     {0,         0,                 0,  0 }
   };
   int c, option_index;
   
   while(1){
-    c = getopt_long(argc, argv, "s:h:k:p:v:x:", long_options, &option_index);
+    c = getopt_long(argc, argv, "s:h:k:p:v:x:g:", long_options, &option_index);
     if( c==-1 ) break;
     switch(c){
       // Board size
@@ -47,6 +49,8 @@ void Options_initialize( Options* options, int argc, char** argv )
     case 'v' : options->verbosity = atoi(optarg); break;
       // Expansion visits threashold
     case 'x' : options->expansionVisits = atoi(optarg); break;
+      // Gogui output mode
+    case 'g': options->gogui = 1; break;
     }
   }
 }

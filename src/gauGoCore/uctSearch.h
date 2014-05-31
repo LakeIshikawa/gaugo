@@ -93,16 +93,6 @@ void UCTSearch_initialize( UCTSearch* search, Board* board, UCTTree* tree,
 INTERSECTION UCTSearch_search( UCTSearch* search );
 
 /**
- * @brief Writes the resulting pv to the specified array.
- *
- * @param search The search
- * @param pv The array to which pv moves will be written starting at position 0. All positions
- * past last move in table are filled with value PASS.
- * @param The node from which to get the pv
- **/
-void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node );
-
-/**
  * @brief Prints the header for search info (ASCII table format)
  **/
 void UCTSearch_printSearchInfoHeader();
@@ -113,4 +103,12 @@ void UCTSearch_printSearchInfoHeader();
  * @param search The search going on
  **/
 void UCTSearch_printSearchInfo( UCTSearch* search );
+
+/**
+ * @brief Prints current search info to stderr in the form 
+ * of gogui live-gfx commands, showing info about current pv
+ * 
+ * @param search The search going on
+ **/
+void UCTSearch_printSearchGoguiGfx( UCTSearch* search );
 #endif

@@ -19,6 +19,7 @@ ZobristValues zobrist1;
 ZobristValues zobrist2;
 int zobristInitialized = 0;
 
+const int nodiags[4] = {1, 3, 4, 6};
 
 // Board private methods declarations
 
@@ -49,17 +50,17 @@ void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup,
 		      unsigned char* libs, INTERSECTION neigh);
 
 /**
- * @brief Recalculate number of liberties of a string recursively.
- * Also, sets all stone's group map to 'newGroup'
- * 
+ * @brief Recalculates all pattern indexes of all neighbors 
+ * of stones of the specified group, with specified stone color
+ * (the group's color) and atari status (the group's atari status)
+ *
  * @param board The board
- * @param newGroup Group map of merged group's stones will be set to this
- * @param start A stone of the string to calculate libs of
- * @param libmap A bitmap of size MAX_INTERSECTION_NUM to store 
- * the state of recursion
+ * @param group The group id
+ * @param color Group's color
+ * @param atari Group's atari status
  **/
-int Board_recalculateLiberties(Board* board, GRID newGroup,
-			       INTERSECTION start, unsigned char* libmap);
+void Board_recalculateGroupPatterns(Board* board, GRID group, 
+				    int color, int atari);
 
 /**
  * @brief Removed all stones of the specified group from the board, 
@@ -125,11 +126,15 @@ void Board_initialize(Board* board, unsigned char size)
 
   // set the size and compute the direction offsets
   board->size = size;
-  // Data used to compute neighbourgh intersection's indexes {N, E, S, W}
-  board->directionOffsets[0] = -board->size-1;
-  board->directionOffsets[1] = 1;
-  board->directionOffsets[2] = board->size+1;
+  // Data used to compute neighbourgh intersection's indexes
+  board->directionOffsets[0] = -board->size-2;
+  board->directionOffsets[1] = -board->size-1;
+  board->directionOffsets[2] = -board->size;
   board->directionOffsets[3] = -1;
+  board->directionOffsets[4] = 1;
+  board->directionOffsets[5] = board->size;
+  board->directionOffsets[6] = board->size+1;
+  board->directionOffsets[7] = board->size+2;
 
   // no initial ko
   board->koPosition = -1;
@@ -162,7 +167,7 @@ void Board_initialize(Board* board, unsigned char size)
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
     int x = i%(size+1);
     int y = i/(size+1);
-    if( x == size || y == 0 || y > size ){
+    if( x == 0 || y == 0 || y > size ){
       board->intersectionMap[i] = BORDER;
     }
     else{
@@ -176,6 +181,38 @@ void Board_initialize(Board* board, unsigned char size)
     board->groupMap[i] = NULL_GROUP;
     board->nextStone[i] = 0;
   }
+
+  // initialize patterns
+  Board_initializePatterns(board);
+}
+
+void Board_initializePatterns(Board* board)
+{
+  for( int in=0; in<MAX_INTERSECTION_NUM; in++ ){
+    // init to empty
+    board->patterns3x3[in] = 0;
+
+    int neigh;
+    for( NEIGHBORS_DIAG(in) ){
+      neigh = NEIGHI_DIAG(board, in);
+
+      if( neigh>=0 && neigh<MAX_INTERSECTION_NUM ){
+	Color nc = board->intersectionMap[neigh];
+	if( nc != EMPTY ){
+	  int cpatt = board->patterns3x3[in];
+	  int mask = 7<<((7-i)*3);
+	  if( nc == BORDER ){
+	    board->patterns3x3[in] = (cpatt&~mask) | ((2<<((7-i)*3))&mask); 
+	  }
+	  else{
+	    int atari = board->groups[board->groupMap[neigh]].libertiesNum == 1;
+	    int bits = 4|(nc<<1)|atari;
+	    board->patterns3x3[in] = cpatt&~mask | ((bits<<((7-i)*3))&mask);
+	  }
+	}
+      }
+    }
+  }
 }
 
 void Board_copy(Board* dst, Board* src)
@@ -188,12 +225,12 @@ INTERSECTION Board_intersection(Board* board, int x, int y)
 {
   gauAssert( x>=0 && x < board->size && y >=0 && y < board->size, board, NULL );
 
-  return (INTERSECTION)(((y+1) * (board->size+1)) + x);
+  return (INTERSECTION)(((y+1) * (board->size+1)) + x+1);
 }
 
 int Board_intersectionX(Board* board, INTERSECTION intersection)
 {
-  return intersection % (board->size+1);
+  return (intersection % (board->size+1))-1;
 }
 
 int Board_intersectionY(Board* board, INTERSECTION intersection)
@@ -305,9 +342,21 @@ void Board_playEmpty(Board* board, int emptyId)
   unsigned char libs[MAX_INTERSECTION_NUM];
   memset(libs, 0, sizeof(libs));
   int unifiedGroup = Board_placeStone(board, emptyId, libs);
-  
+  int atariExists = 0;
+  int notAtariExists = 0;
+
   // If new stone has 4 liberties, stop here
   if( board->groups[unifiedGroup].libertiesNum != 4 ){
+
+    // Determine if a neighbours friend group in atari/not-atari exists
+    for(NEIGHBORS(intersection)) {
+      int neigh = NEIGHI(board, intersection);
+      if( board->intersectionMap[neigh] != board->turn ) continue;
+      if( board->groups[board->groupMap[neigh]].libertiesNum == 1 ) 
+	atariExists = 1;
+      else
+	notAtariExists = 1;
+    }
 
     /**
      * Merge all surrounding groups with new group
@@ -341,7 +390,13 @@ void Board_playEmpty(Board* board, int emptyId)
       
       ar[ari++] = neighgroup;
       board->groups[neighgroup].libertiesNum--;
-      
+
+      // Recompute group's patterns if new atari
+      if( board->groups[neighgroup].libertiesNum == 1 ){
+	Board_recalculateGroupPatterns( board, neighgroup, !board->turn, 1 );
+      }
+
+      // Kill if dead
       if( board->groups[neighgroup].libertiesNum == 0 ){
 	// Update captured stones and eventually save ko position
 	capturedStones += board->groups[neighgroup].stonesNum;
@@ -368,8 +423,45 @@ void Board_playEmpty(Board* board, int emptyId)
     }
   }
 
+  // Update patterns
+  int unifiedLibs = board->groups[unifiedGroup].libertiesNum;
+  
+  if( (atariExists && unifiedLibs > 1) ||
+      (notAtariExists && unifiedLibs == 1)) {
+    // Recalculate all group
+    Board_recalculateGroupPatterns( board, unifiedGroup, board->turn,
+				    unifiedLibs==1 );
+  } else {
+    // Only neighbours are ok
+    int neigh;
+    for( NEIGHBORS_DIAG(intersection) ){
+      neigh = NEIGHI_DIAG(board, intersection);
+      int mask = 7<<(i*3);
+      int bits = (4|(board->turn<<1)|(unifiedLibs==1))<<(i*3);
+      board->patterns3x3[neigh] = 
+	(board->patterns3x3[neigh]&~mask) | (bits & mask);
+    }
+  }
+  
   // Swap turn
   board->turn = !board->turn;
+}
+
+void Board_recalculateGroupPatterns(Board* board, GRID group, 
+				    int color, int atari)
+{
+  INTERSECTION stone, neigh;
+  for( STONES(board, group) ){
+    stone = STONEI();
+
+    for( NEIGHBORS_DIAG(stone) ){
+      neigh = NEIGHI_DIAG(board, stone);
+      int mask = 7<<(i*3);
+      int bits = (4|(color<<1)|atari)<<(i*3);
+      board->patterns3x3[neigh] = 
+	(board->patterns3x3[neigh]&~mask) | (bits & mask);
+    }
+  }
 }
 
 HashKey Board_childHash(Board* board, int emptyId)
@@ -515,8 +607,7 @@ void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup,
 }
 
 void Board_killGroup(Board* board, GRID group)
-{
-  // Deletes the group
+{  // Deletes the group
   board->groups[group].stonesNum = 0;
   
   INTERSECTION stone;
@@ -548,6 +639,12 @@ void Board_killGroup(Board* board, GRID group)
 
 	aa[aai++] = board->groupMap[neigh];
 	board->groups[board->groupMap[neigh]].libertiesNum++;
+
+	// If atari status changed, recompute patterns
+	if( board->groups[board->groupMap[neigh]].libertiesNum == 2 ){
+	  Board_recalculateGroupPatterns( board, board->groupMap[neigh], 
+					  board->turn, 0 );
+	}
       }
     }
   }
@@ -634,6 +731,14 @@ void Board_unsetStone(Board* board, INTERSECTION intersection)
   board->intersectionMap[intersection] = EMPTY;
   board->groupMap[intersection] = NULL_GROUP;
 
+  // Patterns update
+  int neigh;
+  for( NEIGHBORS_DIAG(intersection) ){
+    neigh = NEIGHI_DIAG(board, intersection);
+    int mask = 7<<(i*3);
+    board->patterns3x3[neigh] = board->patterns3x3[neigh]&~mask;
+  }
+
   // Add new empty intersection to list
   board->empties[board->emptiesNum++] = intersection;
 }
@@ -662,10 +767,11 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
 
   // Prints every line
   for( int y=0; y<board->size; y++ ){
-    fprintf(stream, "%-3d", y+1);
+    fprintf(stream, "%-3d", board->size-y);
     // Prints every intersection
     for( int x=0; x<board->size; x++ ){
-      int intersection = board->intersectionMap[Board_intersection(board, x, y)];
+      int intersection = 
+	board->intersectionMap[Board_intersection(board, x, y)];
       fprintf(stream, "%c ",
 	      intersection == BLACK ? 'X' : 
 	      intersection == EMPTY ? '-' : 
@@ -730,7 +836,7 @@ void Board_intersectionName(Board* board, INTERSECTION intersection,
     // Sunningly, no 'I' column in GTP
     if( col >= 'I' ) col++;
 
-    sprintf(nameBuffer, "%c%d", col, y+1);
+    sprintf(nameBuffer, "%c%d", col, board->size-y);
   }
 }
 
@@ -743,7 +849,7 @@ INTERSECTION Board_intersectionFromName(Board* board, char* name)
   if( ax >= 'I' ) ax--;
 
   int x = ax - 'A';
-  int y = atoi(name+1)-1;
+  int y = board->size-atoi(name+1);
 
   // If name is not proper, returns an error value
   if( x<0 || y<0 || x>=board->size || y>=board->size){

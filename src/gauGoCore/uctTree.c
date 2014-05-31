@@ -61,7 +61,33 @@ UCTNode* UCTTree_newNode( UCTTree* tree )
   return newNode;
 }
 
+void UCTTree_getPv( INTERSECTION* pv, UCTNode* node )
+{
+  // Select most visited move from root
+  int mostPlayed = -1;
+  INTERSECTION bestMove = 0;
+  UCTNode* bestChild = NULL;
+
+  // Browses all children
+  foreach_child( node ){
+    int played = child->played;
+    if( played > mostPlayed ) {
+      mostPlayed = played;
+      bestMove = child->move;
+      bestChild = child;
+    }
+  }
+  
+  *pv = bestMove;
+
+  // Recursion
+  if( node->firstChild != NULL ){
+    UCTTree_getPv( pv+1, bestChild );
+  }
+}
+
 void UCTNode_initialize( UCTNode* node )
 {
   memset( node, 0, sizeof(UCTNode) );
 }
+

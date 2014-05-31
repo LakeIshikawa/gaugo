@@ -31,6 +31,9 @@ typedef struct Options
   /** Minimum number of visits for a UCT node before being expanded */
   int expansionVisits;
 
+  /** Gogui extension output */
+  int gogui;
+
 } Options;
 
 

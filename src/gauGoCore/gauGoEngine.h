@@ -122,6 +122,13 @@ int GauGoEngine_redo(GauGoEngine* engine);
 void GauGoEngine_sayError(GTPError error);
 
 /**
+ * @brief Send GTP custom error response to stdout
+ *
+ * @param error Error message
+ **/
+void GauGoEngine_sayErrorCustom(const char* error);
+
+/**
  * @brief Send GTP success response to stdout
  *
  * @param response GTP response to send to stdout

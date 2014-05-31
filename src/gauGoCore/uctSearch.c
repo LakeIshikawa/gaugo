@@ -105,34 +105,9 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
   } while(!(*(search->stopper))(search, simulations));
 
   INTERSECTION pv[MAX_INTERSECTION_NUM];
-  UCTSearch_getPv( search, pv, &search->tree->root );
+  UCTTree_getPv( pv, &search->tree->root );
 
   return pv[0];
-}
-
-void UCTSearch_getPv( UCTSearch* search, INTERSECTION* pv, UCTNode* node )
-{
-  // Select most visited move from root
-  int mostPlayed = -1;
-  INTERSECTION bestMove = 0;
-  UCTNode* bestChild = NULL;
-
-  // Browses all children
-  foreach_child( node ){
-    int played = child->played;
-    if( played > mostPlayed ) {
-      mostPlayed = played;
-      bestMove = child->move;
-      bestChild = child;
-    }
-  }
-  
-  *pv = bestMove;
-
-  // Recursion
-  if( node->firstChild != NULL ){
-    UCTSearch_getPv( search, pv+1, bestChild );
-  }
 }
 
 void UCTSearch_printSearchInfoHeader()
@@ -155,7 +130,7 @@ void UCTSearch_printSearchInfo( UCTSearch* search )
 
   // Gets pv
   INTERSECTION pv[MAX_INTERSECTION_NUM];
-  UCTSearch_getPv( search, pv, &search->tree->root );
+  UCTTree_getPv( pv, &search->tree->root );
   
   for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
     if( !pv[i] ) break;
@@ -165,6 +140,38 @@ void UCTSearch_printSearchInfo( UCTSearch* search )
     printf("%s ", str);
   }
   printf("\n");
+}
+
+void UCTSearch_printSearchGoguiGfx( UCTSearch* search )
+{
+Board boardCopy = search->root;
+  search->board = &boardCopy;
+  
+  int elapsedMillis = Timer_getElapsedTime( &search->timer );
+  int pps = (search->tree->root.played*1000) / elapsedMillis; 
+  float wr = (float)search->tree->root.winsBlack / search->tree->root.played;
+  fprintf(stderr, "gogui-gfx: TEXT %-3.2fs %dpo %dpps %-3.1fk %-4.2fwr\n",
+	 (float)elapsedMillis/1000.0f, search->tree->root.played, pps, 
+	 search->options->komi, wr );
+
+  // Gets pv
+  INTERSECTION pv[MAX_INTERSECTION_NUM];
+  UCTTree_getPv( pv, &search->tree->root );
+    
+  // VAR
+  fprintf(stderr, "gogui-gfx: VAR ");
+  Color turn = boardCopy.turn;
+  for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
+    if( !pv[i] ) break;
+    
+    char str[5];
+    Board_intersectionName( search->board, pv[i], str );
+    fprintf(stderr, "%c %s ", turn==BLACK?'b':'w', str);
+
+    turn = !turn;
+  }
+  
+  fprintf(stderr, "\n");  
 }
 
 Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos, 

@@ -11,6 +11,7 @@
 #include "GTPBasicCommands.h"
 #include "GTPArchiving.h"
 #include "GTPGogui.h"
+#include "GTPPatterns.h"
 
 /**
  * @brief GTP command processor function type
@@ -52,6 +53,10 @@ CmdAndProcessor commandProcessors[] = {
   // Gogui
   { "gogui-analyze_commands", &GTPGogui_analyzecommands },
   { "gogui-nodeinfo", &GTPGogui_nodeinfo },
+  { "gogui-pv", &GTPGogui_pv },
+
+  // Patterns
+  { "pattern", &GTPPatterns_pattern },
 
   { NULL, NULL }
 };
@@ -210,6 +215,12 @@ void GauGoEngine_sayError(GTPError error)
   case BAD_DATA: printf("? bad data\n\n"); break;
   }
 
+  fflush(stdout);
+}
+
+void GauGoEngine_sayErrorCustom(const char* error)
+{
+  printf("? %s", error);
   fflush(stdout);
 }
 

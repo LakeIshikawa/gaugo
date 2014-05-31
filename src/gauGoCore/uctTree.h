@@ -116,6 +116,15 @@ void UCTTree_delete( UCTTree* tree );
 UCTNode* UCTTree_newNode( UCTTree* tree );
 
 /**
+ * @brief Writes the resulting pv to the specified array.
+ *
+ * @param pv The array to which pv moves will be written starting at position 0. 
+ * All positions past last move in table are filled with value PASS.
+ * @param The node from which to get the pv
+ **/
+void UCTTree_getPv( INTERSECTION* pv, UCTNode* node );
+
+/**
  * @brief Initializes a node to default values
  *
  * @param node The node to initialize

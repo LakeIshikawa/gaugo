@@ -16,6 +16,12 @@
 void GTPGogui_analyzecommands( GauGoEngine* engine, int argc, char** argv );
 
 /**
+ * @brief Outputs pv from current position in gogui gfx format
+ * to visualize pv on the board.
+ **/
+void GTPGogui_pv( GauGoEngine* engine, int argc, char** argv );
+
+/**
  * @brief Outputs ucttree nodes information about current position's
  * childrens, if any ucttree is available (i.e. if a previous genmove 
  * exists)

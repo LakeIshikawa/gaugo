@@ -71,6 +71,12 @@ typedef struct Board
   StoneGroup groups[MAX_STONEGROUPS];
 
   /**
+   * 3x3 pattern bit representation (8 stones, 24 bits)
+   * 1 intersection bits= 0(stone)(color)(atari)
+   **/
+  int patterns3x3[MAX_INTERSECTION_NUM];
+
+  /**
    * List of empty squares
    **/
   short empties[MAX_INTERSECTION_NUM];
@@ -125,9 +131,9 @@ typedef struct Board
 
   /**
    * Table of offsets used to compute neighbourgh
-   * intersection index in all possible directions {N, E, S, W}
+   * intersection index in all possible directions including diagonals
    **/
-  signed char directionOffsets[4];
+  signed char directionOffsets[8];
 
   /**
    * Index of the first available (uninitialized) group in groups
@@ -160,8 +166,12 @@ typedef struct Board
  * neighbourgh being browsed.
  *
  **/
+extern const int nodiags[4];
 #define NEIGHBORS(x) int i=0; i<4; i++
-#define NEIGHI(board, x) x+board->directionOffsets[i]
+#define NEIGHI(board, x) x+board->directionOffsets[nodiags[i]]
+
+#define NEIGHBORS_DIAG(x) int i=0; i<8; i++
+#define NEIGHI_DIAG(board, x) x+board->directionOffsets[i]
 
 /**
  * Utilities to browse empty list prettily:
@@ -182,6 +192,15 @@ typedef struct Board
  * @param size The board's side size
  **/
 void Board_initialize(Board* board, unsigned char size);
+
+/**
+ * @brief Calculates all (3x3)pattern indexes for current
+ * board state.  This is fairly slow and should be used
+ * only in initializations.
+ *
+ * @param board The board
+ **/
+void Board_initializePatterns(Board* board);
 
 /**
  * @brief Entirely copy all board data from specified source to destination

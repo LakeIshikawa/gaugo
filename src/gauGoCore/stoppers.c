@@ -5,6 +5,7 @@
  **/
 
 #include "stoppers.h"
+#include <unistd.h>
 
 void printTreeInfo( UCTSearch* search )
 {
@@ -23,6 +24,12 @@ int STOPPER_5ksim( UCTSearch* search, int simulations )
       // Line
       UCTSearch_printSearchInfo( search );
       fflush(stdout);
+    }
+
+    // Prints gogui live gfx if in gogui mode
+    if( search->options->gogui ){
+      UCTSearch_printSearchGoguiGfx( search );
+      fflush(stderr);
     }
   }
   return simulations >= 50000;
