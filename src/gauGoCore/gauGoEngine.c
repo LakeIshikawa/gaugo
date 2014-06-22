@@ -12,6 +12,7 @@
 #include "GTPArchiving.h"
 #include "GTPGogui.h"
 #include "GTPPatterns.h"
+#include "GTPBench.h"
 
 /**
  * @brief GTP command processor function type
@@ -57,6 +58,10 @@ CmdAndProcessor commandProcessors[] = {
 
   // Patterns
   { "pattern", &GTPPatterns_pattern },
+  { "pinfo", &GTPPatterns_patternInfo },
+
+  // Bench
+  { "pobench", &GTPBench_playoutBench },
 
   { NULL, NULL }
 };
@@ -220,7 +225,7 @@ void GauGoEngine_sayError(GTPError error)
 
 void GauGoEngine_sayErrorCustom(const char* error)
 {
-  printf("? %s", error);
+  printf("? %s\n\n", error);
   fflush(stdout);
 }
 

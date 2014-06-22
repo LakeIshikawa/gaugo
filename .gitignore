@@ -1,5 +1,7 @@
 build*
 doc/
+learn/
+junk/
 backup/
 aclocal.m4
 ar-lib

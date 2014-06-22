@@ -91,7 +91,8 @@ INTERSECTION UCTSearch_search( UCTSearch* search )
     Board_copy( &boardCopy, &search->root );
     search->board = &boardCopy;
     // Copy last boards
-    memcpy(search->lastBoards, search->rootLastBoards, sizeof(search->lastBoards));
+    memcpy(search->lastBoards, search->rootLastBoards, 
+	   sizeof(search->lastBoards));
     search->lastBoards_next = 0;
 
     // Play one playout from the most UCT-RAVE promising node
@@ -144,7 +145,7 @@ void UCTSearch_printSearchInfo( UCTSearch* search )
 
 void UCTSearch_printSearchGoguiGfx( UCTSearch* search )
 {
-Board boardCopy = search->root;
+  Board boardCopy = search->root;
   search->board = &boardCopy;
   
   int elapsedMillis = Timer_getElapsedTime( &search->timer );
@@ -187,7 +188,8 @@ Color UCTSearch_playSimulation( UCTSearch* search, UCTNode* pos,
     }
 
     // Play random game
-    winner = (*(search->policy))(search, playedMoves);
+    winner = (*(search->policy))(search->board, search->iter, 
+				 search->options->komi, playedMoves);
   }
   else{
 

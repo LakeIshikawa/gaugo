@@ -7,6 +7,7 @@
 #include "board.h"
 #include "board_zobrist.h"
 #include "crash.h"
+#include "p3x3info.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -24,43 +25,14 @@ const int nodiags[4] = {1, 3, 4, 6};
 // Board private methods declarations
 
 /**
- * @brief Merges all groups neighbours of 'start' into 'newGroup'.
- * Stone and liberties will all be transfered to newGroup, and all
- * neighbour groups will be deleted
- *
- * @param board The board
- * @param newGroup The new group (1-stone brand new)
- * @param start A stone of either groups to merge
- * @param libs Liberty map to avoid adding a liberty twice
- **/
-void Board_mergeNeighbors(Board* board, GRID newGroup, INTERSECTION start,
-			  unsigned char* libs);
-
-/**
  * @brief Merge group at 'neigh' to newGroup updating maps, 
  * group stone and liberty counts, and removing the old group.
  *
  * @brief board The board
  * @brief newGroup The new group to merge to
  * @brief oldGroup The group to delete and merge
- * @brief libs Liberties map to avoid adding a liberty twice
- * @brief neigh Merge the group at this stone
  **/
-void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup,
-		      unsigned char* libs, INTERSECTION neigh);
-
-/**
- * @brief Recalculates all pattern indexes of all neighbors 
- * of stones of the specified group, with specified stone color
- * (the group's color) and atari status (the group's atari status)
- *
- * @param board The board
- * @param group The group id
- * @param color Group's color
- * @param atari Group's atari status
- **/
-void Board_recalculateGroupPatterns(Board* board, GRID group, 
-				    int color, int atari);
+void Board_mergeGroups(Board* board, GRID newGroup, GRID oldGroup);
 
 /**
  * @brief Removed all stones of the specified group from the board, 
@@ -77,13 +49,11 @@ void Board_killGroup(Board* board, GRID group);
  * around it.
  *
  * @param board The board
- * @param emptyId The ordinal of the empty intersection to be added to 
- * the new group
- * @param libs Liberty map to be filled
+ * @param intersection The intersection to play on
  * @return The pool index of the new group initialized with the single 
  * stone and its liberties
  **/
-GRID Board_placeStone(Board* board, int emptyId, unsigned char* libs);
+GRID Board_placeStone(Board* board, INTERSECTION intersection);
 
 /**
  * @brief Sets the ko position to the specified intersection, 
@@ -106,10 +76,10 @@ void Board_unsetKoPosition(Board* board);
  * updating the hash key value accordingly. This function makes no error-checking
  *
  * @param board The board
- * @param emptyId The ordinal of the empty intersection on which to place the stone
+ * @param intersection The intersection to play on
  * @param color The color of the stone to place
  **/
-void Board_setStone(Board* board, int emptyId, Color color);
+void Board_setStone(Board* board, INTERSECTION intersection, Color color);
 
 /**
  * @brief Sets the specified intersection state to the specified stone color,
@@ -119,6 +89,19 @@ void Board_setStone(Board* board, int emptyId, Color color);
  * @param intersection The intersection on which to remove the stone
  **/
 void Board_unsetStone(Board* board, INTERSECTION intersection);
+
+/**
+ * @brief If the given group is in atari, updates 3x3 hash of
+ * the only move that is the liberty of the group with the atari
+ * state of neighbor stones!
+ * (thanks libego)
+ **/
+void Board_maybeAtari3x3(Board* board, GRID group);
+
+/**
+ * @brief Version for the group becoming not-atari
+ **/
+void Board_maybeAtariEnd3x3(Board* board, GRID group);
 
 void Board_initialize(Board* board, unsigned char size)
 {
@@ -143,8 +126,8 @@ void Board_initialize(Board* board, unsigned char size)
   board->blackCaptures = 0;
   // black's turn at start
   board->turn = BLACK;
-  // no groups
-  board->firstAvailableGroup = 0;
+  // no last move
+  board->lastMove = 0;
 
   // Clears hash (empty board is (1,1) 
   // to differentiate from unstored position(0,0))
@@ -158,7 +141,7 @@ void Board_initialize(Board* board, unsigned char size)
   }
 
   // initialize the group map and groups
-  for( int i=0; i<MAX_STONEGROUPS; i++ ){
+  for( int i=0; i<MAX_INTERSECTION_NUM; i++ ){
     board->groups[i].stonesNum = 0;
   }
   
@@ -175,6 +158,7 @@ void Board_initialize(Board* board, unsigned char size)
 
       // Add to empty list
       board->empties[board->emptiesNum++] = i;
+      board->emptiesMap[i] = board->emptiesNum-1;
     }
 
     // Group map
@@ -200,16 +184,24 @@ void Board_initializePatterns(Board* board)
 	Color nc = board->intersectionMap[neigh];
 	if( nc != EMPTY ){
 	  int cpatt = board->patterns3x3[in];
-	  int mask = 7<<((7-i)*3);
+	  int mask = 3<<((7-i)*2);
 	  if( nc == BORDER ){
-	    board->patterns3x3[in] = (cpatt&~mask) | ((2<<((7-i)*3))&mask); 
+	    board->patterns3x3[in] = (cpatt&~mask) | ((1<<((7-i)*2))&mask); 
 	  }
 	  else{
-	    int atari = board->groups[board->groupMap[neigh]].libertiesNum == 1;
-	    int bits = 4|(nc<<1)|atari;
-	    board->patterns3x3[in] = cpatt&~mask | ((bits<<((7-i)*3))&mask);
+	    int bits = 2|nc;
+	    board->patterns3x3[in] = cpatt&~mask | ((bits<<((7-i)*2))&mask);
 	  }
 	}
+      }
+    }
+
+    // Atari bits
+    for( NEIGHBORS(in) ){
+      neigh = NEIGHI(board, in);
+      if( board->intersectionMap[neigh] <= WHITE ){
+	int atari = StoneGroup_isAtari(&board->groups[board->groupMap[neigh]]);
+	board->patterns3x3[in] = board->patterns3x3[in] | (atari<<(16+(3-i)));
       }
     }
   }
@@ -248,6 +240,7 @@ Color Board_getColor(Board* board, INTERSECTION intersection)
 
 int Board_isLegal(Board* board, INTERSECTION intersection)
 {
+#ifdef DEBUG
   // Check that intersection is a valid coordinate
   if( Board_intersectionX(board, intersection) < 0
       || Board_intersectionX(board, intersection) >= board->size
@@ -255,11 +248,12 @@ int Board_isLegal(Board* board, INTERSECTION intersection)
       || Board_intersectionY(board, intersection) >= board->size){
     return 0;
   }
-  
+#endif  
+
   // If the intersection is not empty, the move is not legal
-  if( board->intersectionMap[intersection] != EMPTY ) return 0;
-  // Ko move not legal
-  if( board->koPosition == intersection ) return 0;
+  // Ko move also not legal
+  if( board->intersectionMap[intersection] != EMPTY
+      || board->koPosition == intersection ) return 0;
   
   /* The move is legal if:
      a) It is touching an empty square
@@ -269,38 +263,49 @@ int Board_isLegal(Board* board, INTERSECTION intersection)
      If none of the above is true, the move is illegal
   */
 
-  // Check all directions!
+  // a) touching an empty square
+  if( Board_anyEmptyNeigh(board, intersection) ) return 1;
+
+  // b&c) Remove a liberty from surrounding groups
   int neigh;
   for( NEIGHBORS(intersection ) ){
     neigh = NEIGHI(board, intersection);
-    if( board->intersectionMap[neigh] == EMPTY ) return 1;
-    
-    StoneGroup* neighbourgh = STONE_GROUP(board->groupMap[neigh]);
-    if( board->intersectionMap[neigh] == board->turn 
-	&& neighbourgh->libertiesNum >= 2 ) return 1;
-    if( board->intersectionMap[neigh] == !board->turn 
-	&& neighbourgh->libertiesNum == 1 ) return 1;
+    board->groups[board->groupMap[neigh]].libertiesNum--;
   }
 
-  // None of a) b) c) holds, therefore the move should be suicide
-  return 0;
+  // Check for suicide
+  int capture, not_suicide = 0;
+  for( NEIGHBORS(intersection ) ){
+    neigh = NEIGHI(board, intersection);
+    capture = board->groups[board->groupMap[neigh]].libertiesNum == 0;
+    // It is not suicide if you capture an opponent group
+    // or it is not atari if any of your groups would not be killed by
+    // your new move
+    not_suicide |= capture != (board->intersectionMap[neigh] == board->turn); 
+  }
+  
+  // Restore original liberties
+  for( NEIGHBORS(intersection ) ){
+    neigh = NEIGHI(board, intersection);
+    board->groups[board->groupMap[neigh]].libertiesNum++;
+  }
+    
+  return not_suicide;
 }
 
 int Board_isLegalNoEyeFilling(Board* board, INTERSECTION intersection)
 {
+  // Eye information in 3x3 info bits
+  if( p3x3info[board->patterns3x3[intersection]] & (board->turn+1) ) 
+    return 0;
+  // Must be legal
   if( !Board_isLegal( board, intersection ) ) return 0;
+  return 1;
+}
 
-  int neigh;
-  for( NEIGHBORS(intersection) ){
-    neigh = NEIGHI( board, intersection );
-    Color nc = Board_getColor( board, neigh );
-    if( nc == EMPTY || nc == !board->turn ) return 1;
-
-    // If self stone in atari, its OK to fill eye
-    if( STONE_GROUP( board->groupMap[neigh] )->libertiesNum == 1 ) return 1;
-  }
-
-  return 0;
+int Board_anyEmptyNeigh(Board* board, INTERSECTION intersection)
+{
+  return p3x3info[board->patterns3x3[intersection]] >= 3;
 }
 
 int Board_mustPass(Board* board, BoardIterator* iter)
@@ -316,93 +321,54 @@ int Board_mustPass(Board* board, BoardIterator* iter)
 
 void Board_play(Board* board, INTERSECTION intersection)
 {
-  for(int i=0; i<board->emptiesNum; i++ ){
-    if( board->empties[i] == intersection ){
-      Board_playEmpty(board, i);
-      return;
-    }
-  }
-
-  gauAssert(0, board, NULL);
-}
-
-void Board_playEmpty(Board* board, int emptyId)
-{
-  INTERSECTION intersection = board->empties[emptyId];
   gauAssert(Board_isLegal(board, intersection), board, NULL);
+
+  // Remember as last move
+  board->lastMove = intersection;
 
   // Resets ko
   Board_unsetKoPosition(board);
 
-  // Counters for captured stones number and palce (if 1, for ko)
+  // Counters for captured stones number and place (if 1, for ko)
   short capturedStones = 0;
   INTERSECTION koPosition = -1;
 
   // Create a group for the new stone (which will be eventually merged)
-  unsigned char libs[MAX_INTERSECTION_NUM];
-  memset(libs, 0, sizeof(libs));
-  int unifiedGroup = Board_placeStone(board, emptyId, libs);
-  int atariExists = 0;
-  int notAtariExists = 0;
+  GRID unifiedGroup = Board_placeStone(board, intersection);
 
   // If new stone has 4 liberties, stop here
   if( board->groups[unifiedGroup].libertiesNum != 4 ){
 
-    // Determine if a neighbours friend group in atari/not-atari exists
+    // Remove captured groups and merge friend chains
     for(NEIGHBORS(intersection)) {
       int neigh = NEIGHI(board, intersection);
-      if( board->intersectionMap[neigh] != board->turn ) continue;
-      if( board->groups[board->groupMap[neigh]].libertiesNum == 1 ) 
-	atariExists = 1;
-      else
-	notAtariExists = 1;
-    }
-
-    /**
-     * Merge all surrounding groups with new group
-     **/
-    Board_mergeNeighbors(board, unifiedGroup, intersection, libs);
-    
-    /** 
-     * Removes the liberty corresponding to the played intersection, for all the
-     * opponent groups which have a liberty on the played intersection.
-     *
-     * Also kills a group if it has no more liberties.
-     **/
-    GRID ar[4] = {NULL_GROUP, NULL_GROUP, NULL_GROUP, NULL_GROUP};
-    int ari=0;
-    
-    for(NEIGHBORS(intersection)) {
-      int neigh = NEIGHI(board, intersection);
-      if( board->intersectionMap[neigh] != !board->turn ) continue;
-      
       int neighgroup = board->groupMap[neigh];
       
-      // Skip already decreased groups
-      int skip = 0;
-      for( int j=0; j<ari; j++ ){
-	if( neighgroup == ar[j] ) {
-	  skip = 1;
-	  break;
+      // Friend? merge
+      if( board->intersectionMap[neigh] == board->turn 
+	  && unifiedGroup != neighgroup ){
+	if( board->groups[unifiedGroup].stonesNum
+	    > board->groups[neighgroup].stonesNum ){
+	  Board_mergeGroups(board, unifiedGroup, neighgroup);
+	}
+	else{
+	  Board_mergeGroups(board, neighgroup, unifiedGroup);
+	  unifiedGroup = neighgroup;
 	}
       }
-      if( skip ) continue;
-      
-      ar[ari++] = neighgroup;
-      board->groups[neighgroup].libertiesNum--;
-
-      // Recompute group's patterns if new atari
-      if( board->groups[neighgroup].libertiesNum == 1 ){
-	Board_recalculateGroupPatterns( board, neighgroup, !board->turn, 1 );
-      }
-
-      // Kill if dead
-      if( board->groups[neighgroup].libertiesNum == 0 ){
-	// Update captured stones and eventually save ko position
-	capturedStones += board->groups[neighgroup].stonesNum;
-	if( capturedStones == 1 ) koPosition = neigh;
-	
-	Board_killGroup( board, neighgroup );
+      // Opponent(captured)? kill
+      else if( board->intersectionMap[neigh] == !board->turn ){
+	if( StoneGroup_isCaptured(&board->groups[neighgroup]) ){
+	  // Update captured stones and eventually save ko position
+	  capturedStones += board->groups[neighgroup].stonesNum;
+	  if( capturedStones == 1 ) koPosition = neigh;
+	  
+	  Board_killGroup( board, neighgroup );
+	}
+	// Might be in atari: update pattern
+	else{
+	  Board_maybeAtari3x3(board, neighgroup);
+	}
       }
     }
 
@@ -423,50 +389,47 @@ void Board_playEmpty(Board* board, int emptyId)
     }
   }
 
-  // Update patterns
-  int unifiedLibs = board->groups[unifiedGroup].libertiesNum;
-  
-  if( (atariExists && unifiedLibs > 1) ||
-      (notAtariExists && unifiedLibs == 1)) {
-    // Recalculate all group
-    Board_recalculateGroupPatterns( board, unifiedGroup, board->turn,
-				    unifiedLibs==1 );
-  } else {
-    // Only neighbours are ok
-    int neigh;
-    for( NEIGHBORS_DIAG(intersection) ){
-      neigh = NEIGHI_DIAG(board, intersection);
-      int mask = 7<<(i*3);
-      int bits = (4|(board->turn<<1)|(unifiedLibs==1))<<(i*3);
-      board->patterns3x3[neigh] = 
-	(board->patterns3x3[neigh]&~mask) | (bits & mask);
-    }
-  }
+  // You may be in atari
+  Board_maybeAtari3x3(board, unifiedGroup);
   
   // Swap turn
   board->turn = !board->turn;
 }
 
-void Board_recalculateGroupPatterns(Board* board, GRID group, 
-				    int color, int atari)
+void Board_maybeAtari3x3(Board* board, GRID group)
 {
-  INTERSECTION stone, neigh;
-  for( STONES(board, group) ){
-    stone = STONEI();
-
-    for( NEIGHBORS_DIAG(stone) ){
-      neigh = NEIGHI_DIAG(board, stone);
-      int mask = 7<<(i*3);
-      int bits = (4|(color<<1)|atari)<<(i*3);
-      board->patterns3x3[neigh] = 
-	(board->patterns3x3[neigh]&~mask) | (bits & mask);
-    }
-  }
+  // If not in atari, do nothing
+  if( !StoneGroup_isAtari(&board->groups[group]) ) return;
+  
+  INTERSECTION atari = StoneGroup_atariLiberty(&board->groups[group]);  
+  int atariBits = 
+    ((board->groupMap[atari+board->directionOffsets[1]]==group )<< 19)
+    | ((board->groupMap[atari+board->directionOffsets[3]]==group) << 18)
+    | ((board->groupMap[atari+board->directionOffsets[4]]==group) << 17)
+    | ((board->groupMap[atari+board->directionOffsets[6]]==group) << 16);
+  
+  board->patterns3x3[atari] |= atariBits;
 }
 
-HashKey Board_childHash(Board* board, int emptyId)
+void Board_maybeAtariEnd3x3(Board* board, GRID group)
 {
-  INTERSECTION intersection = board->empties[emptyId];
+  // If not in atari, do nothing
+  if( !StoneGroup_isAtari(&board->groups[group]) ) return;
+  // If the group is captured, do nothins
+  if( StoneGroup_isCaptured(&board->groups[group]) ) return;
+
+  INTERSECTION atari = StoneGroup_atariLiberty(&board->groups[group]);
+  int atariBits = 
+    ((board->groupMap[atari+board->directionOffsets[1]]==group )<< 19)
+    | ((board->groupMap[atari+board->directionOffsets[3]]==group) << 18)
+    | ((board->groupMap[atari+board->directionOffsets[4]]==group) << 17)
+    | ((board->groupMap[atari+board->directionOffsets[6]]==group) << 16);
+  
+  board->patterns3x3[atari] &= ~atariBits;
+}
+
+HashKey Board_childHash(Board* board, INTERSECTION intersection)
+{
   gauAssert(Board_isLegal(board, intersection), board, NULL);
   
   HashKey result = board->hashKey;
@@ -489,7 +452,7 @@ HashKey Board_childHash(Board* board, int emptyId)
     }
     
     int neighgroup = board->groupMap[neigh];
-    if( board->groups[neighgroup].libertiesNum == 1 ){
+    if( StoneGroup_isAtari(&board->groups[neighgroup]) ){
 
       // Hash kill stone
       INTERSECTION stone;
@@ -554,26 +517,13 @@ void Board_iterator(Board* board, BoardIterator* iterator)
   }
 }
 
-void Board_mergeNeighbors(Board* board, GRID newGroup, INTERSECTION start, 
-			  unsigned char* libs)
-{  
-  int neigh;
-  for( NEIGHBORS(start) ){
-    neigh = NEIGHI( board, start );
-      
-    // if neighbourgh intersection is a friend stone, merge all!
-    if( board->intersectionMap[neigh] == board->turn &&
-	newGroup != board->groupMap[neigh] ){
-      Board_mergeGroup(board, newGroup, board->groupMap[neigh], libs, neigh);
-    }
-  }
-}
-
-void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup, 
-		      unsigned char* libs, INTERSECTION neigh)
+void Board_mergeGroups(Board* board, GRID newGroup, GRID oldGroup)
 {
   // Merge stone number and delete old group
   board->groups[newGroup].stonesNum += board->groups[oldGroup].stonesNum;
+  board->groups[newGroup].libertiesNum += board->groups[oldGroup].libertiesNum;
+  board->groups[newGroup].libSum += board->groups[oldGroup].libSum;
+  board->groups[newGroup].libSumSq += board->groups[oldGroup].libSumSq;
   board->groups[oldGroup].stonesNum = 0;
 
   // Update all stone's map and count liberties
@@ -581,22 +531,8 @@ void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup,
   INTERSECTION stone = 0;
   for( STONES( board, oldGroup) ){
     stone = STONEI();
-      
     // Update maps
     board->groupMap[stone] = newGroup;
-
-    // Liberties
-    int stoneNeigh;
-    for( NEIGHBORS(stone) ){
-      stoneNeigh = NEIGHI(board, stone);      
-      if( board->intersectionMap[stoneNeigh] == EMPTY ){
-	if( !(libs[stoneNeigh]&1) ){
-	  // Flag the liberty so it won't be added twice
-	  libs[stoneNeigh] |= 1;
-	  board->groups[newGroup].libertiesNum++;
-	}
-      }
-    }
   }
 
   // Insert merged group's head right after new head
@@ -607,68 +543,43 @@ void Board_mergeGroup(Board* board, GRID newGroup, GRID oldGroup,
 }
 
 void Board_killGroup(Board* board, GRID group)
-{  // Deletes the group
+{  
+  // Deletes the group
   board->groups[group].stonesNum = 0;
   
   INTERSECTION stone;
+  // Remove all stones
   for( STONES(board, group) ){
     stone = STONEI();
-
     // Kill stone
     Board_unsetStone(board, stone);
-    
-    // Give liberty to any surrounding group
-    int aa[4] = {NULL_GROUP, NULL_GROUP, NULL_GROUP, NULL_GROUP};
-    int aai = 0;
-  
+
     int neigh;
     for( NEIGHBORS(stone) ){
       neigh = NEIGHI(board, stone);
       // Liberty add
       if( board->intersectionMap[neigh] == board->turn ){
-	
-	// Skip already added groups
-	int skip = 0;
-	for( int j=0; j<aai; j++ ){
-	  if( board->groupMap[neigh] == aa[j] ) {
-	    skip = 1;
-	    break;
-	  }
-	}
-	if( skip ) continue;
-
-	aa[aai++] = board->groupMap[neigh];
-	board->groups[board->groupMap[neigh]].libertiesNum++;
-
-	// If atari status changed, recompute patterns
-	if( board->groups[board->groupMap[neigh]].libertiesNum == 2 ){
-	  Board_recalculateGroupPatterns( board, board->groupMap[neigh], 
-					  board->turn, 0 );
-	}
+	Board_maybeAtariEnd3x3(board, board->groupMap[neigh]);
+	StoneGroup_addLib(&board->groups[board->groupMap[neigh]], stone);
       }
     }
   }
 }
 
-GRID Board_placeStone(Board* board, int emptyId, unsigned char* libs)
+GRID Board_placeStone(Board* board, INTERSECTION intersection)
 {
-  INTERSECTION intersection = board->empties[emptyId];
-
   // Initialize an available group
-  GRID newGroup = board->firstAvailableGroup;
-
-  // Adjust the firstAvailableGroup pointer
-  do board->firstAvailableGroup = 
-       (board->firstAvailableGroup+1) % MAX_STONEGROUPS; 
-  while (board->groups[board->firstAvailableGroup].stonesNum != 0);
+  GRID newGroup = intersection;
 
   // Sets the new group informations
   board->groups[newGroup].libertiesNum = 0;
+  board->groups[newGroup].libSum = 0;
+  board->groups[newGroup].libSumSq = 0;
   board->groups[newGroup].stonesNum = 1;
   board->groups[newGroup].groupHead = intersection;
 
   // Put the stone on the board
-  Board_setStone(board, emptyId, board->turn);
+  Board_setStone(board, intersection, board->turn);
   board->groupMap[intersection] = newGroup;
   board->nextStone[intersection] = 0;
 
@@ -676,9 +587,15 @@ GRID Board_placeStone(Board* board, int emptyId, unsigned char* libs)
   int neigh;
   for( NEIGHBORS(intersection) ) {
     neigh = NEIGHI(board, intersection);
+    
+    // If liberty, add it to current new group
     if( board->intersectionMap[neigh] == EMPTY ){
-      board->groups[newGroup].libertiesNum++;
-      libs[neigh] |= 1;
+      StoneGroup_addLib(&board->groups[newGroup], neigh);
+    } else {
+      // If stone, decrease that group's liberties!
+      // This means that shared liberties are decreased twice
+      // or 3 times!! All ok
+      StoneGroup_subLib(&board->groups[board->groupMap[neigh]], intersection);
     }
   }
 
@@ -697,9 +614,8 @@ void Board_unsetKoPosition(Board* board)
   }
 }
 
-void Board_setStone(Board* board, int emptyId, Color color)
+void Board_setStone(Board* board, INTERSECTION intersection, Color color)
 {
-  INTERSECTION intersection = board->empties[emptyId];
   board->intersectionMap[intersection] = color;
   
   switch( color ){
@@ -713,7 +629,19 @@ void Board_setStone(Board* board, int emptyId, Color color)
   }
 
   // Remove empty from list
-  board->empties[emptyId] = board->empties[--board->emptiesNum];
+  board->emptiesNum--;
+  board->emptiesMap[board->empties[board->emptiesNum]] = board->emptiesMap[intersection];
+  board->empties[board->emptiesMap[intersection]] = board->empties[board->emptiesNum];
+
+  // Update patterns
+  int neigh;
+  for( NEIGHBORS_DIAG(intersection) ){
+    neigh = NEIGHI_DIAG(board, intersection);
+    int mask = 3<<(i*2);
+    int bits = (2|board->turn)<<(i*2);
+    board->patterns3x3[neigh] = 
+      (board->patterns3x3[neigh]&~mask) | (bits & mask);
+  }
 }
 
 void Board_unsetStone(Board* board, INTERSECTION intersection)
@@ -731,16 +659,17 @@ void Board_unsetStone(Board* board, INTERSECTION intersection)
   board->intersectionMap[intersection] = EMPTY;
   board->groupMap[intersection] = NULL_GROUP;
 
+  // Add new empty intersection to list
+  board->emptiesMap[intersection] = board->emptiesNum;
+  board->empties[board->emptiesNum++] = intersection;
+
   // Patterns update
   int neigh;
   for( NEIGHBORS_DIAG(intersection) ){
     neigh = NEIGHI_DIAG(board, intersection);
-    int mask = 7<<(i*3);
+    int mask = 3<<(i*2);
     board->patterns3x3[neigh] = board->patterns3x3[neigh]&~mask;
   }
-
-  // Add new empty intersection to list
-  board->empties[board->emptiesNum++] = intersection;
 }
 
 void Board_print(Board* board, FILE* stream, int withGroupInfo)
@@ -787,7 +716,7 @@ void Board_print(Board* board, FILE* stream, int withGroupInfo)
 	    "id", "libs", "nstn", "stones");
 
   
-    for( int g=0; g<MAX_STONEGROUPS; g++ ){
+    for( int g=0; g<MAX_INTERSECTION_NUM; g++ ){
       StoneGroup* group = &board->groups[g];
       if( group->stonesNum > 0 ){
 	fprintf(stream, "%-3d %-5d %-5d ", 

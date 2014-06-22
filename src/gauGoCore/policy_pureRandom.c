@@ -30,7 +30,7 @@ INTERSECTION pureRandom_playRandom(Board* board)
     // Play it
     if( pureRandom_isPlayableMove( board,  intersection ) ){
       // play move
-      Board_playEmpty( board, i );
+      Board_play( board, intersection );
       return intersection;
     }
   }
@@ -40,7 +40,7 @@ INTERSECTION pureRandom_playRandom(Board* board)
     // Play it
     if( pureRandom_isPlayableMove( board,  intersection ) ){
       // play move
-      Board_playEmpty( board, i );
+      Board_play( board, intersection );
       return intersection;
     }
   }
@@ -50,23 +50,25 @@ INTERSECTION pureRandom_playRandom(Board* board)
   return PASS;
 }
 
-Color POLICY_pureRandom( UCTSearch* search, unsigned char* playedMoves )
+Color POLICY_pureRandom( Board* board, BoardIterator* iter, 
+			 float komi, unsigned char* playedMoves )
 {
   int passed = 0;
   for( int m=0; m<PLAYOUT_MOVES_MAX; m++ ){
-    INTERSECTION move = pureRandom_playRandom( search->board );
+    INTERSECTION move = pureRandom_playRandom( board );
+
     if( move == PASS ){
       if( passed ){
 	// Endgame!
-	int score = (float)Board_trompTaylorScore( search->board, search->iter );
-	return (score > search->options->komi) ? BLACK : WHITE;
+	int score = (float)Board_trompTaylorScore( board, iter );
+	return (score > komi) ? BLACK : WHITE;
       }
       passed = 1;
     } else {
       passed = 0;
 
       // Mark the move as played
-      playedMoves[move] |= (!search->board->turn)+1;
+      playedMoves[move] |= (!board->turn)+1;
     }
   }
 }

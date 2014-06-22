@@ -36,7 +36,7 @@
  * The first and last line of the board will be filled with BORDER
  * intersections, as long as the last column.
  **/
-#define MAX_INTERSECTION_NUM ((MAX_BOARD_SIZE+1) * (MAX_BOARD_SIZE+2))
+#define MAX_INTERSECTION_NUM ((MAX_BOARD_SIZE+1) * (MAX_BOARD_SIZE+2) + 1)
 
 /**
  * @brief Maximum number of moves in one playout 
@@ -47,7 +47,7 @@
 /**
  * @brief Type used to index stone groups in the stone group pool
  **/
-typedef unsigned char GRID;
+typedef short GRID;
 
 /**
  * @brief Type used to represent intersections
@@ -58,14 +58,7 @@ typedef short INTERSECTION;
  * @brief Constant representing the null stone group 
  * (= no stone group informations)
  **/
-#define NULL_GROUP ((GRID)255)
-
-/**
- * @brief Maximum supported number of groups on the board.
- * The maximum theoretical number of legal strings(groups) is
- * actually 277... whatever.
- **/
-#define MAX_STONEGROUPS 255
+#define NULL_GROUP ((GRID)0)
 
 /**
  * @brief The maximum number of children a node can have for
@@ -75,5 +68,11 @@ typedef short INTERSECTION;
  *
  **/
 #define UCT_PASSNODE_MAX_CHILDREN 10
+
+/**
+ * Max/min utils
+ **/
+#define MAX(a, b) (a)>(b)?(a):(b)
+#define MIN(a, b) (a)<(b)?(a):(b)
 
 #endif

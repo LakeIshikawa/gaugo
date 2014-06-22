@@ -15,4 +15,10 @@
  **/
 void GTPPatterns_pattern( GauGoEngine* engine, int argc, char** argv );
 
+/**
+ * @brief Outputs current pattern info bits
+ * (eye, neighlib statuses)
+ **/
+void GTPPatterns_patternInfo( GauGoEngine* engine, int argc, char** argv );
+
 #endif

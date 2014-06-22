@@ -10,14 +10,23 @@
 #ifndef STONEGROUP_H
 #define STONEGROUP_H
 
-#include "board.h"
-
+#include "global_defs.h"
 
 /**
  * @brief Represents a fully connected group of stones
  **/
 typedef struct StoneGroup
 {
+  /**
+   * The sum of all (liberty vertex indexes squared)!
+   **/
+  int libSumSq;
+
+  /**
+   * The sum of all liberty vertex indexes
+   **/
+  int libSum;
+
   /**
    * The number of intersections (stones) that belong to this group
    **/
@@ -44,5 +53,31 @@ typedef struct StoneGroup
  **/
 #define STONES(board, group) INTERSECTION _st=board->groups[group].groupHead; _st; _st=board->nextStone[_st]
 #define STONEI() _st
+
+/**
+ * @brief Determines if the group is in atari
+ **/
+int StoneGroup_isAtari(StoneGroup* group);
+
+/**
+ * @brief Obtains the only liberty of the group
+ * The group must be in atari
+ **/
+INTERSECTION StoneGroup_atariLiberty(StoneGroup* group);
+
+/**
+ * @brief Determines if the group is captured
+ **/
+int StoneGroup_isCaptured(StoneGroup* group);
+
+/**
+ * @brief Adds a liberty to the group
+ **/
+void StoneGroup_addLib(StoneGroup* group, INTERSECTION lib);
+
+/**
+ * @brief Subtracts a liberty from the group
+ **/
+void StoneGroup_subLib(StoneGroup* group, INTERSECTION lib);
 
 #endif

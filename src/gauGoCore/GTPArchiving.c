@@ -27,9 +27,8 @@ void GTPArchiving_loadSGF( GauGoEngine* engine, int argc, char** argv )
 
   // Get board size and reset/resize the board accordingly
   sgftreeForward( &tree );
-  int size;
+  int size=19;
   sgfGetIntProperty( tree.lastnode, "SZ", &size );
-
   engine->options.boardSize = size;
   GauGoEngine_resetBoard( engine );
 

@@ -6,7 +6,7 @@
 #ifndef POLICIES_H
 #define POLICIES_H
 
-#include "uctSearch.h"
+#include "board.h"
 
 /**
  * @brief Pure random playout policy.
@@ -15,6 +15,7 @@
  * Scores are then calculated using tromp-taylor rules, 
  * and the winner is returned.
  **/
-Color POLICY_pureRandom( UCTSearch* search, unsigned char* playedMoves );
+Color POLICY_pureRandom( Board* board, BoardIterator* it, 
+			 float komi, unsigned char* playedMoves );
 
 #endif

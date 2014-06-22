@@ -155,7 +155,7 @@ void GTPBasicCommands_quit( GauGoEngine* engine, int argc, char** argv )
 void GTPBasicCommands_printboard( GauGoEngine* engine, int argc, char** argv )
 {
   printf("= ");
-  Board_print( engine->board, stdout, 0 );
+  Board_print( engine->board, stdout, 1 );
   printf("\n");
   fflush(stdout);
 }

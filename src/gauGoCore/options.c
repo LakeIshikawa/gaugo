@@ -21,12 +21,12 @@ void Options_initialize( Options* options, int argc, char** argv )
 
   // Parse command line options
   static struct option long_options[] = {
-    {"boardsize", no_argument, 0,  's'},
-    {"hashsize", no_argument, 0,  'h'},
-    {"tpnodes", no_argument, 0, 'p'},
-    {"komi", no_argument, 0,  'k'},
-    {"verbosity", no_argument, 0, 'v'},
-    {"expansion_visits", no_argument, 0, 'x'},
+    {"boardsize", required_argument, 0,  's'},
+    {"hashsize", required_argument, 0,  'h'},
+    {"tpnodes", required_argument, 0, 'p'},
+    {"komi", required_argument, 0,  'k'},
+    {"verbosity", required_argument, 0, 'v'},
+    {"expansion_visits", required_argument, 0, 'x'},
     {"gogui", no_argument, 0, 'g'},
     //{"datapath", required_argument, 0,  'd' },
     {0,         0,                 0,  0 }

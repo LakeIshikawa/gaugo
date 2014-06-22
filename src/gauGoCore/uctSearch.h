@@ -25,7 +25,8 @@ struct UCTSearch;
  * @brief Function that transform an arbitrary go board 
  * into a finished game (i.e. performs a playout)
  **/
-typedef Color (*POLICY)(struct UCTSearch*, unsigned char* playedMoves);
+typedef Color (*POLICY)(Board*, BoardIterator*, float, 
+			unsigned char* playedMoves);
 
 /**
  * @brief Function that determines whether to stop UCT 

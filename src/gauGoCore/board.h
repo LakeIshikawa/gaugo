@@ -25,7 +25,7 @@
 /**
  * @brief Representation of the pass move
  **/
-#define PASS 400
+#define PASS 888
 
 /**
  * @brief The value that an intersection might have
@@ -68,18 +68,30 @@ typedef struct Board
    * This resources are pointed by groupMap, and
    * represent all actual stone groups present on the board
    **/
-  StoneGroup groups[MAX_STONEGROUPS];
+  StoneGroup groups[MAX_INTERSECTION_NUM];
 
   /**
-   * 3x3 pattern bit representation (8 stones, 24 bits)
-   * 1 intersection bits= 0(stone)(color)(atari)
+   * 3x3 pattern bit representation (8 stones, 20 bits)
+   * 1 intersection bits= (stone)(color)
+   * pattern = aN-aW-aE-aS-s1-s2-s3-s4-s5-s6-s7-s8
+   *
+   * aX = atari on X direction (1bit)
+   * sx = stone in x position (2bits) 00:empty 01:border 10:b 11: w
+   * 1 2 3
+   * 4   5
+   * 6 7 8
    **/
   int patterns3x3[MAX_INTERSECTION_NUM];
 
   /**
    * List of empty squares
    **/
-  short empties[MAX_INTERSECTION_NUM];
+  INTERSECTION empties[MAX_INTERSECTION_NUM];
+  
+  /**
+   * Map of empty squares
+   **/
+  short emptiesMap[MAX_INTERSECTION_NUM];
   
   /**
    * Number of empty squares
@@ -107,16 +119,16 @@ typedef struct Board
   INTERSECTION koPosition;
 
   /**
+   * Last move played
+   **/
+  INTERSECTION lastMove;
+
+  /**
    * Points to the next stone in the group
    * (to fastly loop all stones in a group)
    **/
   INTERSECTION nextStone[MAX_INTERSECTION_NUM];
 
-  /**
-   * The map of intersections
-   **/
-  Color intersectionMap[MAX_INTERSECTION_NUM];
-  
   /**
    * The map from coordinates to stoneGroups index.
    * For every intersection, the pool index of the group to which it 
@@ -124,6 +136,11 @@ typedef struct Board
    **/
   GRID groupMap[MAX_INTERSECTION_NUM];
 
+  /**
+   * The map of intersections
+   **/
+  Color intersectionMap[MAX_INTERSECTION_NUM];
+  
   /**
    * The size of the board's side
    **/
@@ -134,11 +151,6 @@ typedef struct Board
    * intersection index in all possible directions including diagonals
    **/
   signed char directionOffsets[8];
-
-  /**
-   * Index of the first available (uninitialized) group in groups
-   **/
-  GRID firstAvailableGroup;
 
 } Board;
 
@@ -168,7 +180,10 @@ typedef struct Board
  **/
 extern const int nodiags[4];
 #define NEIGHBORS(x) int i=0; i<4; i++
+#define NEIGHBORS2(x, it) int it=0; it<4; it++
 #define NEIGHI(board, x) x+board->directionOffsets[nodiags[i]]
+#define NEIGHI2(board, x, it) x+board->directionOffsets[nodiags[it]]
+#define NEIGHI_SIMM(board, x) x+board->directionOffsets[nodiags[3-i]]
 
 #define NEIGHBORS_DIAG(x) int i=0; i<8; i++
 #define NEIGHI_DIAG(board, x) x+board->directionOffsets[i]
@@ -258,12 +273,20 @@ int Board_isLegal(Board* board, INTERSECTION intersection);
 /**
  * @brief Determines if the specified move is legal and not
  * self-eye filling.  It is ok to fill self false eyes if at
- * least one of the surrounding groups is in atari
+ * least two of the diagonals are occupied by opponent's stones
  *
  * @param board The board
  * @param intersection The intersection to play on
  **/
 int Board_isLegalNoEyeFilling(Board* board, INTERSECTION intersection);
+
+/**
+ * @brief Determines if there is at least one empty intersection
+ * neighboring the given one
+ * 
+ * @param 
+ **/
+int Board_anyEmptyNeigh(Board* board, INTERSECTION intersection);
 
 /**
  * @brief Determines wether the next move for current turn's player 
@@ -286,27 +309,14 @@ int Board_mustPass(Board* board, BoardIterator* iter);
 void Board_play(Board* board, INTERSECTION intersection);
 
 /**
- * @brief Plays at the empty intersection that has the
- * specified ordinal index (emptyId) in the empties list.
- * This function is faster than Board_play because it does
- * not search the empty list.
- *
- * @param board The board to play on
- * @param emptyId The ordinal of the empty intersection in empties list
- * to play at
- **/
-void Board_playEmpty(Board* board, int emptyId);
-
-/**
  * @brief Calculates the hash of the child board position
  * after the specified move(empty) is played.
  * The move must be legal.
  *
  * @param board The board
- * @param emptyId The ordinal of the empty intersection
- * in empties list
+ * @param intersection The intersection to play on
  **/
-HashKey Board_childHash(Board* board, int emptyId);
+HashKey Board_childHash(Board* board, INTERSECTION intersection);
 
 /**
  * @brief Plays a pass move on the specified board, which results
